@@ -1,0 +1,135 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MonitorState {
+  UNKNOWN
+  UP
+  DOWN
+  PAUSED
+}
+
+enum IncidentStatus {
+  OPEN
+  RESOLVED
+}
+
+enum NotificationType {
+  DOWN
+  RECOVERED
+  SSL_EXPIRING
+  MANUAL_CHECK
+  DAILY_SUMMARY
+  WEEKLY_SUMMARY
+}
+
+model User {
+  id                   String    @id @default(cuid())
+  telegramId           String    @unique
+  username             String?
+  firstName            String?
+  timezone             String    @default("Europe/Moscow")
+  dailySummaryEnabled  Boolean   @default(false)
+  weeklySummaryEnabled Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  monitors             Monitor[]
+
+  @@index([createdAt])
+}
+
+model Monitor {
+  id                  String            @id @default(cuid())
+  userId              String
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                String
+  url                 String
+  normalizedUrl       String
+  isActive            Boolean           @default(true)
+  intervalMinutes     Int
+  timeoutMs           Int               @default(5000)
+  consecutiveFailures Int               @default(0)
+  failureThreshold    Int               @default(3)
+  recoveryThreshold   Int               @default(1)
+  currentState        MonitorState      @default(UNKNOWN)
+  lastCheckedAt       DateTime?
+  lastStatusCode      Int?
+  lastResponseTimeMs  Int?
+  lastErrorMessage    String?
+  requiredText        String?
+  checkSsl            Boolean           @default(false)
+  checkJson           Boolean           @default(false)
+  jsonRules           Json?
+  deletedAt           DateTime?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  checkResults        CheckResult[]
+  incidents           Incident[]
+  sslAlerts           SslAlertLog[]
+  notifications       NotificationLog[]
+
+  @@index([userId, isActive, deletedAt])
+  @@index([currentState, isActive])
+  @@index([normalizedUrl])
+}
+
+model CheckResult {
+  id             String   @id @default(cuid())
+  monitorId      String
+  monitor        Monitor  @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  success        Boolean
+  statusCode     Int?
+  responseTimeMs Int?
+  errorMessage   String?
+  contentMatched Boolean?
+  jsonMatched    Boolean?
+  checkedAt      DateTime @default(now())
+
+  @@index([monitorId, checkedAt(sort: Desc)])
+  @@index([success, checkedAt])
+}
+
+model Incident {
+  id                  String         @id @default(cuid())
+  monitorId           String
+  monitor             Monitor        @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  startedAt           DateTime
+  resolvedAt          DateTime?
+  durationSeconds     Int?
+  reason              String
+  status              IncidentStatus
+  openedAfterFailures Int            @default(3)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  @@index([monitorId, status, startedAt(sort: Desc)])
+  @@index([status, startedAt(sort: Desc)])
+}
+
+model SslAlertLog {
+  id            String   @id @default(cuid())
+  monitorId     String
+  monitor       Monitor  @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  thresholdDays Int
+  expiresAt     DateTime
+  sentAt        DateTime @default(now())
+
+  @@unique([monitorId, thresholdDays, expiresAt])
+  @@index([monitorId, sentAt(sort: Desc)])
+}
+
+model NotificationLog {
+  id        String           @id @default(cuid())
+  monitorId String
+  monitor   Monitor          @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  payload   Json
+  sentAt    DateTime         @default(now())
+
+  @@index([monitorId, type, sentAt(sort: Desc)])
+}
