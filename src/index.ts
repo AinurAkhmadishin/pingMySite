@@ -4,8 +4,6 @@ import TelegramBot from 'node-telegram-bot-api';
 import https from 'https';
 import http from 'http';
 
-const HttpsProxyAgent = require('https-proxy-agent');
-
 const BOT_TOKEN = process.env.BOT_TOKEN!;
 const CHECK_INTERVAL = 60000;
 const TIMEOUT = 10000;
@@ -21,23 +19,30 @@ interface CheckResult {
   status: number | string;
 }
 
-const botOptions: any = { polling: true };
-if (process.env.PROXY_URL) {
-  botOptions.request = {
-    agent: new HttpsProxyAgent(process.env.PROXY_URL)
-  };
-}
-
-const bot = new TelegramBot(BOT_TOKEN, botOptions);
 const app = express();
 const PORT = process.env.PORT || 3000;
-
 const monitors = new Map<number, Monitor[]>();
 
-bot.onText(/\/start/, (msg) => {
-  const chatId = msg.chat.id;
-  bot.sendMessage(chatId,
-    `👋 Добро пожаловать в Ping Bot!
+let bot: TelegramBot;
+
+async function createBot(): Promise<TelegramBot> {
+  const botOptions: any = { polling: true };
+
+  if (process.env.PROXY_URL) {
+    const HttpsProxyAgent = require('https-proxy-agent');
+    botOptions.request = {
+      agent: new HttpsProxyAgent(process.env.PROXY_URL)
+    };
+  }
+
+  return new TelegramBot(BOT_TOKEN, botOptions);
+}
+
+function setupBotHandlers(botInstance: TelegramBot) {
+  botInstance.onText(/\/start/, (msg) => {
+    const chatId = msg.chat.id;
+    botInstance.sendMessage(chatId,
+      `👋 Добро пожаловать в Ping Bot!
 
 Команды:
 /add <url> — добавить сайт на мониторинг
@@ -46,12 +51,12 @@ bot.onText(/\/start/, (msg) => {
 /help — показать это сообщение
 
 Пример: /add https://google.com`
-  );
-});
+    );
+  });
 
-bot.onText(/\/help/, (msg) => {
-  bot.sendMessage(msg.chat.id,
-    `📋 Как пользоваться:
+  botInstance.onText(/\/help/, (msg) => {
+    botInstance.sendMessage(msg.chat.id,
+      `📋 Как пользоваться:
 
 /add <url> — начать мониторинг сайта
   Пример: /add https://example.com
@@ -62,71 +67,72 @@ bot.onText(/\/help/, (msg) => {
   Пример: /remove 1
 
 Вы получите уведомление, когда сайт станет недоступен! 🚨`
-  );
-});
-
-bot.onText(/\/add\s+(.+)/, (msg, match) => {
-  const chatId = msg.chat.id;
-  if (!match) return;
-  let url = match[1].trim();
-
-  if (!url.startsWith('http://') && !url.startsWith('https://')) {
-    url = 'https://' + url;
-  }
-
-  if (!monitors.has(chatId)) {
-    monitors.set(chatId, []);
-  }
-
-  const userMonitors = monitors.get(chatId)!;
-
-  if (userMonitors.some(m => m.url === url)) {
-    bot.sendMessage(chatId, `⚠️ Сайт ${url} уже отслеживается!`);
-    return;
-  }
-
-  userMonitors.push({
-    url,
-    isDown: false,
-    lastChecked: null
+    );
   });
 
-  bot.sendMessage(chatId, `✅ Добавлен ${url}\nМониторинг запущен!`);
-});
+  botInstance.onText(/\/add\s+(.+)/, (msg, match) => {
+    const chatId = msg.chat.id;
+    if (!match) return;
+    let url = match[1].trim();
 
-bot.onText(/\/list/, (msg) => {
-  const chatId = msg.chat.id;
-  const userMonitors = monitors.get(chatId);
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url;
+    }
 
-  if (!userMonitors || userMonitors.length === 0) {
-    bot.sendMessage(chatId, '📭 Нет сайтов на мониторинге.\nИспользуйте /add чтобы начать отслеживание.');
-    return;
-  }
+    if (!monitors.has(chatId)) {
+      monitors.set(chatId, []);
+    }
 
-  let message = '📊 Ваши отслеживаемые сайты:\n\n';
-  userMonitors.forEach((m, i) => {
-    const status = m.isDown ? '🔴 НЕДОСТУПЕН' : '🟢 РАБОТАЕТ';
-    const lastCheck = m.lastChecked ? new Date(m.lastChecked).toLocaleTimeString() : 'Ещё не проверялся';
-    message += `${i + 1}. ${m.url}\n   Статус: ${status} | Последняя проверка: ${lastCheck}\n\n`;
+    const userMonitors = monitors.get(chatId)!;
+
+    if (userMonitors.some(m => m.url === url)) {
+      botInstance.sendMessage(chatId, `⚠️ Сайт ${url} уже отслеживается!`);
+      return;
+    }
+
+    userMonitors.push({
+      url,
+      isDown: false,
+      lastChecked: null
+    });
+
+    botInstance.sendMessage(chatId, `✅ Добавлен ${url}\nМониторинг запущен!`);
   });
 
-  bot.sendMessage(chatId, message);
-});
+  botInstance.onText(/\/list/, (msg) => {
+    const chatId = msg.chat.id;
+    const userMonitors = monitors.get(chatId);
 
-bot.onText(/\/remove\s+(\d+)/, (msg, match) => {
-  const chatId = msg.chat.id;
-  if (!match) return;
-  const index = parseInt(match[1]) - 1;
-  const userMonitors = monitors.get(chatId);
+    if (!userMonitors || userMonitors.length === 0) {
+      botInstance.sendMessage(chatId, '📭 Нет сайтов на мониторинге.\nИспользуйте /add чтобы начать отслеживание.');
+      return;
+    }
 
-  if (!userMonitors || index < 0 || index >= userMonitors.length) {
-    bot.sendMessage(chatId, '❌ Неверный номер. Используйте /list для просмотра сайтов.');
-    return;
-  }
+    let message = '📊 Ваши отслеживаемые сайты:\n\n';
+    userMonitors.forEach((m, i) => {
+      const status = m.isDown ? '🔴 НЕДОСТУПЕН' : '🟢 РАБОТАЕТ';
+      const lastCheck = m.lastChecked ? new Date(m.lastChecked).toLocaleTimeString() : 'Ещё не проверялся';
+      message += `${i + 1}. ${m.url}\n   Статус: ${status} | Последняя проверка: ${lastCheck}\n\n`;
+    });
 
-  const removed = userMonitors.splice(index, 1)[0];
-  bot.sendMessage(chatId, `🗑️ Удалён ${removed.url} из мониторинга.`);
-});
+    botInstance.sendMessage(chatId, message);
+  });
+
+  botInstance.onText(/\/remove\s+(\d+)/, (msg, match) => {
+    const chatId = msg.chat.id;
+    if (!match) return;
+    const index = parseInt(match[1]) - 1;
+    const userMonitors = monitors.get(chatId);
+
+    if (!userMonitors || index < 0 || index >= userMonitors.length) {
+      botInstance.sendMessage(chatId, '❌ Неверный номер. Используйте /list для просмотра сайтов.');
+      return;
+    }
+
+    const removed = userMonitors.splice(index, 1)[0];
+    botInstance.sendMessage(chatId, `🗑️ Удалён ${removed.url} из мониторинга.`);
+  });
+}
 
 function checkSite(url: string): Promise<CheckResult> {
   return new Promise((resolve) => {
@@ -173,17 +179,29 @@ async function checkAllSites() {
   }
 }
 
-setInterval(checkAllSites, CHECK_INTERVAL);
+async function main() {
+  try {
+    bot = await createBot();
+    setupBotHandlers(bot);
 
-app.get('/', (_req: Request, res: Response) => {
-  res.json({ status: 'Ping Bot is running', monitoredSites: monitors.size });
-});
+    app.get('/', (_req: Request, res: Response) => {
+      res.json({ status: 'Ping Bot is running', monitoredSites: monitors.size });
+    });
 
-app.get('/health', (_req: Request, res: Response) => {
-  res.json({ ok: true, uptime: process.uptime() });
-});
+    app.get('/health', (_req: Request, res: Response) => {
+      res.json({ ok: true, uptime: process.uptime() });
+    });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🤖 Ping Bot started`);
-});
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`🤖 Ping Bot started`);
+    });
+
+    setInterval(checkAllSites, CHECK_INTERVAL);
+  } catch (error) {
+    console.error('Failed to start bot:', error);
+    process.exit(1);
+  }
+}
+
+main();
