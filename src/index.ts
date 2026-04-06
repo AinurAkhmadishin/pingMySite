@@ -111,7 +111,7 @@ function setupBotHandlers(botInstance: TelegramBot) {
     let message = '📊 Ваши отслеживаемые сайты:\n\n';
     userMonitors.forEach((m, i) => {
       const status = m.isDown ? '🔴 НЕДОСТУПЕН' : '🟢 РАБОТАЕТ';
-      const lastCheck = m.lastChecked ? new Date(m.lastChecked).toLocaleTimeString() : 'Ещё не проверялся';
+      const lastCheck = m.lastChecked ? new Date(m.lastChecked).toLocaleTimeString('ru-RU', { timeZone: 'Europe/Moscow', hour12: false }) : 'Ещё не проверялся';
       message += `${i + 1}. ${m.url}\n   Статус: ${status} | Последняя проверка: ${lastCheck}\n\n`;
     });
 
@@ -165,14 +165,14 @@ async function checkAllSites() {
           `🚨 ВНИМАНИЕ: Сайт НЕДОСТУПЕН!\n\n` +
           `URL: ${monitor.url}\n` +
           `Ошибка: ${result.status}\n` +
-          `Время: ${new Date().toLocaleString()}`
+          `Время: ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow', hour12: false })}`
         );
       } else if (result.ok && monitor.isDown) {
         monitor.isDown = false;
         bot.sendMessage(chatId,
           `✅ Сайт снова РАБОТАЕТ!\n\n` +
           `URL: ${monitor.url}\n` +
-          `Время: ${new Date().toLocaleString()}`
+          `Время: ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow', hour12: false })}`
         );
       }
     }

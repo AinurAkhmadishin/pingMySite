@@ -6,6 +6,9 @@
   <component name="ChangeListManager">
     <list default="true" id="1556166b-d9d0-4129-8f2b-991505ff760a" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/index.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -23,7 +26,7 @@
 }]]></component>
   <component name="GithubPullRequestsUISettings"><![CDATA[{
   "selectedUrlAndAccountId": {
-    "url": "https://github.com/AinurAkhmadishin/pingMySiteTg.git",
+    "url": "https://github.com/AinurAkhmadishin/pingMySite.git",
     "accountId": "7b1ced42-3cad-4197-9946-90ef957d81d1"
   }
 }]]></component>
@@ -94,7 +97,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1775466875451</updated>
-      <workItem from="1775466877808" duration="5301000" />
+      <workItem from="1775466877808" duration="5972000" />
     </task>
     <servers />
   </component>
