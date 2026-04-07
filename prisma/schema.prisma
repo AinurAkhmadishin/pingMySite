@@ -28,6 +28,11 @@ enum NotificationType {
   WEEKLY_SUMMARY
 }
 
+enum MonitorTermKind {
+  TRIAL
+  SUBSCRIPTION
+}
+
 model User {
   id                   String    @id @default(cuid())
   telegramId           String    @unique
@@ -65,6 +70,8 @@ model Monitor {
   checkSsl            Boolean           @default(false)
   checkJson           Boolean           @default(false)
   jsonRules           Json?
+  termKind            MonitorTermKind   @default(TRIAL)
+  endsAt              DateTime?
   deletedAt           DateTime?
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt

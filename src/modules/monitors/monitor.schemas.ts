@@ -28,6 +28,7 @@ export const createMonitorSchema = z.object({
   userId: z.string().min(1),
   name: z.string().min(1).max(100).transform((value) => sanitizeText(value, 100)),
   url: z.string().min(3),
+  termKind: z.enum(["TRIAL", "SUBSCRIPTION"]).default("TRIAL"),
   intervalMinutes: z
     .union([
       z.enum(SUPPORTED_INTERVALS.map(String) as [string, ...string[]]).transform(Number),
@@ -47,6 +48,7 @@ export const createMonitorSchema = z.object({
   checkSsl: z.boolean().default(false),
   checkJson: z.boolean().default(false),
   jsonRules: jsonRulesSchema.optional().nullable(),
+  endsAt: z.coerce.date().optional().nullable(),
   failureThreshold: z.number().int().min(2).max(5).default(DEFAULT_FAILURE_THRESHOLD),
   recoveryThreshold: z.number().int().min(1).max(3).default(DEFAULT_RECOVERY_THRESHOLD),
 });
@@ -58,6 +60,7 @@ export const updateMonitorSettingsSchema = z.object({
   checkSsl: z.boolean().optional(),
   checkJson: z.boolean().optional(),
   jsonRules: jsonRulesSchema.nullable().optional(),
+  endsAt: z.coerce.date().nullable().optional(),
   failureThreshold: z.number().int().min(2).max(5).optional(),
 });
 

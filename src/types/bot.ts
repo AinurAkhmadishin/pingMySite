@@ -1,12 +1,14 @@
 import { User } from "@prisma/client";
 import { Context } from "telegraf";
 
+import { MonitorTermKey } from "../config/constants";
 import { JsonRule } from "../modules/checks/types";
 
 export interface AddMonitorDraft {
   url?: string;
   name?: string;
   intervalMinutes?: number;
+  termKey?: MonitorTermKey;
   requiredText?: string | null;
   checkSsl: boolean;
   checkJson: boolean;
@@ -25,7 +27,8 @@ export interface AddMonitorFlow {
     | "sslToggle"
     | "jsonToggle"
     | "jsonRules"
-    | "sensitivity";
+    | "sensitivity"
+    | "duration";
   draft: AddMonitorDraft;
 }
 

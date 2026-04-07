@@ -36,6 +36,23 @@ export function daysUntil(targetDate: Date, from = new Date()): number {
   return Math.ceil(diffMs / (24 * 60 * 60 * 1000));
 }
 
+export function addDays(date: Date, days: number): Date {
+  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+export function addMonths(date: Date, months: number): Date {
+  const result = new Date(date);
+  const dayOfMonth = result.getDate();
+
+  result.setDate(1);
+  result.setMonth(result.getMonth() + months);
+
+  const lastDayOfTargetMonth = new Date(result.getFullYear(), result.getMonth() + 1, 0).getDate();
+  result.setDate(Math.min(dayOfMonth, lastDayOfTargetMonth));
+
+  return result;
+}
+
 export function subtractHours(date: Date, hours: number): Date {
   return new Date(date.getTime() - hours * 60 * 60 * 1000);
 }

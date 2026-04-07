@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { Prisma } from "@prisma/client";
+import { MonitorState, Prisma } from "@prisma/client";
 import { Redis } from "ioredis";
 
 import { env } from "../../config/env";
@@ -85,6 +85,19 @@ export class MonitorCheckService {
       const monitor = await this.monitorRepository.findByIdWithUser(monitorId);
 
       if (!monitor || monitor.deletedAt) {
+        return null;
+      }
+
+      if (monitor.endsAt && monitor.endsAt <= new Date()) {
+        if (monitor.isActive || monitor.currentState !== MonitorState.PAUSED) {
+          await this.monitorRepository.updateMonitor(monitor.id, {
+            isActive: false,
+            currentState: MonitorState.PAUSED,
+            consecutiveFailures: 0,
+          });
+        }
+
+        logger.info({ monitorId, endsAt: monitor.endsAt.toISOString() }, "Monitor end date reached");
         return null;
       }
 

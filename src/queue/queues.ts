@@ -25,6 +25,28 @@ function defaultJobOptions(): JobsOptions {
   };
 }
 
+function sanitizeJobIdPart(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]/g, "-");
+}
+
+export function buildScheduledMonitorJobId(monitorId: string): string {
+  return `monitor-${sanitizeJobIdPart(monitorId)}`;
+}
+
+export function buildManualCheckJobId(monitorId: string, timestamp: number): string {
+  return `manual-${sanitizeJobIdPart(monitorId)}-${timestamp}`;
+}
+
+export function buildIncidentTransitionJobId(payload: IncidentTransitionJobPayload): string {
+  return `incident-${sanitizeJobIdPart(payload.monitorId)}-${sanitizeJobIdPart(payload.transition)}-${sanitizeJobIdPart(
+    payload.checkedAt,
+  )}`;
+}
+
+export function buildSslCheckJobId(monitorId: string, timestamp: number): string {
+  return `ssl-${sanitizeJobIdPart(monitorId)}-${timestamp}`;
+}
+
 export class QueueManager implements MonitorSchedulerPort, IncidentPublisherPort, SslPublisherPort {
   readonly monitorCheckQueue: Queue<MonitorCheckJobPayload>;
   readonly incidentQueue: Queue<IncidentTransitionJobPayload>;
@@ -64,7 +86,7 @@ export class QueueManager implements MonitorSchedulerPort, IncidentPublisherPort
       },
       {
         ...defaultJobOptions(),
-        jobId: `monitor:${monitorId}`,
+        jobId: buildScheduledMonitorJobId(monitorId),
         repeat: {
           every: intervalMinutes * 60 * 1000,
         },
@@ -77,7 +99,7 @@ export class QueueManager implements MonitorSchedulerPort, IncidentPublisherPort
 
     await Promise.all(
       repeatableJobs
-        .filter((job) => job.id === `monitor:${monitorId}`)
+        .filter((job) => job.id === buildScheduledMonitorJobId(monitorId))
         .map((job) => this.monitorCheckQueue.removeRepeatableByKey(job.key)),
     );
   }
@@ -91,7 +113,7 @@ export class QueueManager implements MonitorSchedulerPort, IncidentPublisherPort
       },
       {
         ...defaultJobOptions(),
-        jobId: `manual:${monitorId}:${Date.now()}`,
+        jobId: buildManualCheckJobId(monitorId, Date.now()),
       },
     );
   }
@@ -99,14 +121,14 @@ export class QueueManager implements MonitorSchedulerPort, IncidentPublisherPort
   async publishIncidentTransition(payload: IncidentTransitionJobPayload): Promise<void> {
     await this.incidentQueue.add(JOB_NAMES.incidentTransition, payload, {
       ...defaultJobOptions(),
-      jobId: `incident:${payload.monitorId}:${payload.transition}:${payload.checkedAt}`,
+      jobId: buildIncidentTransitionJobId(payload),
     });
   }
 
   async publishSslCheck(payload: SslCheckJobPayload): Promise<void> {
     await this.sslQueue.add(JOB_NAMES.sslCheck, payload, {
       ...defaultJobOptions(),
-      jobId: `ssl:${payload.monitorId}:${Date.now()}`,
+      jobId: buildSslCheckJobId(payload.monitorId, Date.now()),
     });
   }
 
@@ -119,7 +141,7 @@ export class QueueManager implements MonitorSchedulerPort, IncidentPublisherPort
         },
         {
           ...defaultJobOptions(),
-          jobId: "summary:daily",
+          jobId: "summary-daily",
           repeat: {
             every: 24 * 60 * 60 * 1000,
           },
@@ -135,7 +157,7 @@ export class QueueManager implements MonitorSchedulerPort, IncidentPublisherPort
         },
         {
           ...defaultJobOptions(),
-          jobId: "summary:weekly",
+          jobId: "summary-weekly",
           repeat: {
             every: 7 * 24 * 60 * 60 * 1000,
           },
@@ -146,7 +168,7 @@ export class QueueManager implements MonitorSchedulerPort, IncidentPublisherPort
 
   async syncMonitorSchedules(monitors: Array<{ id: string; intervalMinutes: number }>): Promise<void> {
     const repeatableJobs = await this.monitorCheckQueue.getRepeatableJobs();
-    const activeMonitorIds = new Set(monitors.map((monitor) => `monitor:${monitor.id}`));
+    const activeMonitorIds = new Set(monitors.map((monitor) => buildScheduledMonitorJobId(monitor.id)));
 
     await Promise.all(
       repeatableJobs

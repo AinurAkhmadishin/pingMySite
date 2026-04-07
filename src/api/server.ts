@@ -4,6 +4,7 @@ import express from "express";
 
 import { AppServices } from "../app/services";
 import { env } from "../config/env";
+import { toErrorMessage } from "../lib/http";
 import { logger } from "../lib/logger";
 
 export async function startApiServer(services: AppServices): Promise<{ close: () => Promise<void> }> {
@@ -19,17 +20,35 @@ export async function startApiServer(services: AppServices): Promise<{ close: ()
   });
 
   app.get("/health", async (_req, res) => {
-    const monitorCount = await services.prisma.monitor.count({
-      where: {
-        deletedAt: null,
-      },
-    });
+    try {
+      const [monitorCount, worker, stuckUnknown] = await Promise.all([
+        services.prisma.monitor.count({
+          where: {
+            deletedAt: null,
+          },
+        }),
+        services.workerHealthService.getWorkerStatus(),
+        services.monitorHealthService.getStuckUnknownSummary(),
+      ]);
 
-    res.json({
-      ok: true,
-      monitorCount,
-      uptimeSeconds: Math.round(process.uptime()),
-    });
+      const ok = worker.isAlive && stuckUnknown.count === 0;
+
+      res.status(ok ? 200 : 503).json({
+        ok,
+        monitorCount,
+        uptimeSeconds: Math.round(process.uptime()),
+        worker,
+        stuckUnknown,
+      });
+    } catch (error) {
+      logger.error({ err: error }, "Health check failed");
+
+      res.status(503).json({
+        ok: false,
+        error: toErrorMessage(error),
+        uptimeSeconds: Math.round(process.uptime()),
+      });
+    }
   });
 
   const server = createServer(app);

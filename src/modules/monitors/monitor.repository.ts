@@ -1,4 +1,4 @@
-import { MonitorState, Prisma, PrismaClient } from "@prisma/client";
+import { MonitorState, MonitorTermKind, Prisma, PrismaClient } from "@prisma/client";
 
 export const monitorWithUserArgs = Prisma.validator<Prisma.MonitorDefaultArgs>()({
   include: {
@@ -47,6 +47,20 @@ export class MonitorRepository {
     });
   }
 
+  async findLatestTrialByNormalizedUrl(userId: string, normalizedUrl: string): Promise<MonitorWithUser | null> {
+    return this.prisma.monitor.findFirst({
+      where: {
+        userId,
+        normalizedUrl,
+        termKind: MonitorTermKind.TRIAL,
+      },
+      ...monitorWithUserArgs,
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+  }
+
   async listByUser(userId: string, filters?: MonitorListFilters): Promise<MonitorWithUser[]> {
     return this.prisma.monitor.findMany({
       where: {
@@ -67,6 +81,16 @@ export class MonitorRepository {
       where: {
         isActive: true,
         deletedAt: null,
+        OR: [
+          {
+            endsAt: null,
+          },
+          {
+            endsAt: {
+              gt: new Date(),
+            },
+          },
+        ],
       },
       ...monitorWithUserArgs,
       orderBy: {

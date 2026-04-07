@@ -1,0 +1,2 @@
+ALTER TABLE "Monitor"
+ADD COLUMN "endsAt" TIMESTAMP(3);

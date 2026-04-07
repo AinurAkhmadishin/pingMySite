@@ -1,0 +1,4 @@
+CREATE TYPE "MonitorTermKind" AS ENUM ('TRIAL', 'SUBSCRIPTION');
+
+ALTER TABLE "Monitor"
+ADD COLUMN "termKind" "MonitorTermKind" NOT NULL DEFAULT 'TRIAL';

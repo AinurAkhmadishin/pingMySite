@@ -18,6 +18,7 @@ export interface MonitorReport {
   monitorName: string;
   url: string;
   currentState: string;
+  endsAt: Date | null;
   averageResponseTimeMs: number | null;
   totalIncidents: number;
   lastIncidentReason?: string;
@@ -90,6 +91,7 @@ export class ReportService {
       monitorName: monitor.name,
       url: monitor.url,
       currentState: monitor.currentState,
+      endsAt: monitor.endsAt,
       averageResponseTimeMs: aggregateStats.averageResponseTimeMs,
       totalIncidents,
       lastIncidentReason: lastIncident?.reason,

@@ -5,12 +5,14 @@ import { HttpChecker } from "../modules/checks/http-checker";
 import { IncidentRepository } from "../modules/incidents/incident.repository";
 import { IncidentService } from "../modules/incidents/incident.service";
 import { MonitorCheckService } from "../modules/monitors/monitor-check.service";
+import { MonitorHealthService } from "../modules/monitors/monitor-health.service";
 import { MonitorRepository } from "../modules/monitors/monitor.repository";
 import { MonitorService } from "../modules/monitors/monitor.service";
 import { NotificationService } from "../modules/notifications/notification.service";
 import { ReportService } from "../modules/reports/report.service";
 import { SummaryService } from "../modules/reports/summary.service";
 import { SslService } from "../modules/ssl/ssl.service";
+import { WorkerHealthService } from "../modules/system/worker-health.service";
 import { UserRepository } from "../modules/users/user.repository";
 import { UserService } from "../modules/users/user.service";
 import { createRedisConnection } from "../queue/connection";
@@ -24,11 +26,13 @@ export interface AppServices {
   userService: UserService;
   monitorService: MonitorService;
   monitorCheckService: MonitorCheckService;
+  monitorHealthService: MonitorHealthService;
   incidentService: IncidentService;
   reportService: ReportService;
   summaryService: SummaryService;
   sslService: SslService;
   notificationService: NotificationService;
+  workerHealthService: WorkerHealthService;
 }
 
 export function createAppServices(): AppServices {
@@ -44,6 +48,8 @@ export function createAppServices(): AppServices {
   const summaryService = new SummaryService(userService, reportService, notificationService);
   const sslService = new SslService(prisma, monitorRepository, notificationService);
   const incidentService = new IncidentService(incidentRepository, monitorRepository, notificationService);
+  const monitorHealthService = new MonitorHealthService(prisma);
+  const workerHealthService = new WorkerHealthService(redis);
   const monitorCheckService = new MonitorCheckService(
     monitorRepository,
     new HttpChecker(),
@@ -60,10 +66,12 @@ export function createAppServices(): AppServices {
     userService,
     monitorService,
     monitorCheckService,
+    monitorHealthService,
     incidentService,
     reportService,
     summaryService,
     sslService,
     notificationService,
+    workerHealthService,
   };
 }
