@@ -33,6 +33,30 @@ enum MonitorTermKind {
   SUBSCRIPTION
 }
 
+enum UserSubscriptionStatus {
+  ACTIVE
+  CANCELED
+  EXPIRED
+}
+
+enum SubscriptionCheckoutStatus {
+  PENDING
+  PAID
+  CANCELED
+  EXPIRED
+}
+
+enum FunnelSessionKind {
+  ADD_MONITOR
+}
+
+enum FunnelSessionStatus {
+  ACTIVE
+  COMPLETED
+  STOPPED
+  ABANDONED
+}
+
 model User {
   id                   String    @id @default(cuid())
   telegramId           String    @unique
@@ -44,6 +68,11 @@ model User {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
   monitors             Monitor[]
+  subscription         UserSubscription?
+  subscriptionCheckouts SubscriptionCheckout[]
+  subscriptionPayments SubscriptionPayment[]
+  funnelSessions       FunnelSession[]
+  funnelEvents         FunnelEvent[]
 
   @@index([createdAt])
 }
@@ -72,6 +101,7 @@ model Monitor {
   jsonRules           Json?
   termKind            MonitorTermKind   @default(TRIAL)
   endsAt              DateTime?
+  billingLocked       Boolean           @default(false)
   deletedAt           DateTime?
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
@@ -83,6 +113,73 @@ model Monitor {
   @@index([userId, isActive, deletedAt])
   @@index([currentState, isActive])
   @@index([normalizedUrl])
+}
+
+model UserSubscription {
+  id                        String                 @id @default(cuid())
+  userId                    String                 @unique
+  user                      User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status                    UserSubscriptionStatus @default(ACTIVE)
+  planKey                   String
+  amountStars               Int
+  currentPeriodStart        DateTime
+  currentPeriodEnd          DateTime
+  cancelAtPeriodEnd         Boolean                @default(false)
+  canceledAt                DateTime?
+  lastPaymentAt             DateTime?
+  lastInvoicePayload        String?
+  lastTelegramPaymentChargeId String?
+  lastProviderPaymentChargeId String?
+  createdAt                 DateTime               @default(now())
+  updatedAt                 DateTime               @updatedAt
+  payments                  SubscriptionPayment[]
+
+  @@index([status, currentPeriodEnd(sort: Desc)])
+}
+
+model SubscriptionCheckout {
+  id                       String                     @id @default(cuid())
+  userId                   String
+  user                     User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  funnelSessionId          String?
+  funnelSession            FunnelSession?             @relation(fields: [funnelSessionId], references: [id], onDelete: SetNull)
+  chatId                   String
+  invoicePayload           String                     @unique
+  status                   SubscriptionCheckoutStatus @default(PENDING)
+  planKey                  String
+  amountStars              Int
+  monitorDraft             Json?
+  createdMonitorId         String?
+  paidAt                   DateTime?
+  expiresAt                DateTime?
+  telegramPaymentChargeId  String?
+  providerPaymentChargeId  String?
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
+
+  @@index([userId, status, createdAt(sort: Desc)])
+  @@index([funnelSessionId, createdAt(sort: Desc)])
+}
+
+model SubscriptionPayment {
+  id                        String            @id @default(cuid())
+  userId                    String
+  user                      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userSubscriptionId        String?
+  userSubscription          UserSubscription? @relation(fields: [userSubscriptionId], references: [id], onDelete: SetNull)
+  invoicePayload            String
+  currency                  String
+  amountStars               Int
+  telegramPaymentChargeId   String            @unique
+  providerPaymentChargeId   String?
+  isRecurring               Boolean           @default(false)
+  isFirstRecurring          Boolean           @default(false)
+  subscriptionExpiresAt     DateTime?
+  createdMonitorId          String?
+  createdAt                 DateTime          @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([invoicePayload, createdAt(sort: Desc)])
 }
 
 model CheckResult {
@@ -139,4 +236,40 @@ model NotificationLog {
   sentAt    DateTime         @default(now())
 
   @@index([monitorId, type, sentAt(sort: Desc)])
+}
+
+model FunnelSession {
+  id               String              @id @default(cuid())
+  userId           String
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind             FunnelSessionKind
+  status           FunnelSessionStatus @default(ACTIVE)
+  currentStepKey   String
+  currentStepLabel String
+  lastEventPayload Json?
+  startedAt        DateTime            @default(now())
+  lastEventAt      DateTime            @default(now())
+  completedAt      DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  events           FunnelEvent[]
+  checkouts        SubscriptionCheckout[]
+
+  @@index([userId, kind, status, lastEventAt(sort: Desc)])
+  @@index([status, lastEventAt(sort: Desc)])
+}
+
+model FunnelEvent {
+  id        String        @id @default(cuid())
+  sessionId String
+  session   FunnelSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stepKey   String
+  stepLabel String
+  payload   Json?
+  createdAt DateTime      @default(now())
+
+  @@index([sessionId, createdAt(sort: Desc)])
+  @@index([userId, stepKey, createdAt(sort: Desc)])
 }

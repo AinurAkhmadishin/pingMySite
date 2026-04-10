@@ -1,10 +1,10 @@
 import { AppServices } from "../../app/services";
+import { parseJsonRulesText } from "../../modules/checks/json-validator";
 import { BotContext } from "../../types/bot";
 import { getCurrentUserOrThrow } from "../context";
 import { intervalKeyboard, sensitivityKeyboard } from "../keyboards/intervals";
 import { settingsKeyboard } from "../keyboards/settings";
 import { buildSettingsMenuMessage } from "../messages/monitor-messages";
-import { parseJsonRulesText } from "../../modules/checks/json-validator";
 
 export async function openSettingsMenu(ctx: BotContext, services: AppServices, monitorId: string): Promise<void> {
   const currentUser = getCurrentUserOrThrow(ctx);
@@ -41,17 +41,6 @@ export async function handleSettingsCallback(ctx: BotContext, services: AppServi
     });
     await ctx.answerCbQuery("Интервал обновлен");
     await openSettingsMenu(ctx, services, monitorId);
-    return true;
-  }
-
-  if (data.startsWith("settings-timeout:")) {
-    ctx.session.flow = {
-      kind: "settings",
-      monitorId: data.split(":")[1],
-      field: "timeout",
-    };
-    await ctx.answerCbQuery();
-    await ctx.reply("Введите новый таймаут в миллисекундах, например 5000.");
     return true;
   }
 
@@ -117,19 +106,6 @@ export async function handleSettingsText(ctx: BotContext, services: AppServices)
 
   const currentUser = getCurrentUserOrThrow(ctx);
   const text = ctx.message.text.trim();
-
-  if (flow.field === "timeout") {
-    const timeoutMs = Number(text);
-
-    if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 30000) {
-      await ctx.reply("Таймаут должен быть числом от 1000 до 30000.");
-      return true;
-    }
-
-    await services.monitorService.updateMonitorSettings(currentUser.id, flow.monitorId, {
-      timeoutMs,
-    });
-  }
 
   if (flow.field === "requiredText") {
     await services.monitorService.updateMonitorSettings(currentUser.id, flow.monitorId, {

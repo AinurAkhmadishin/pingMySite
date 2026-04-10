@@ -18,7 +18,7 @@ export class IncidentService {
     }
 
     if (payload.transition === "DOWN_CONFIRMED") {
-      const existingOpenIncident = await this.incidentRepository.findOpenByMonitorId(monitor.id);
+      const existingOpenIncident = await this.incidentRepository.findOpenByMonitorId(payload.monitorId);
 
       if (existingOpenIncident) {
         return;
@@ -42,7 +42,7 @@ export class IncidentService {
     }
 
     if (payload.transition === "RECOVERED") {
-      const openIncident = await this.incidentRepository.findOpenByMonitorId(monitor.id);
+      const openIncident = await this.incidentRepository.findOpenByMonitorId(payload.monitorId);
 
       if (!openIncident) {
         return;

@@ -37,10 +37,20 @@ const numberFromEnv = (defaultValue: number, min: number, max: number) =>
     return value;
   }, z.number().int().min(min).max(max));
 
+const optionalStringFromEnv = () =>
+  z.preprocess((value) => {
+    if (value === undefined || value === null || value === "") {
+      return undefined;
+    }
+
+    return String(value);
+  }, z.string().min(1).optional());
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   APP_HOST: z.string().min(1).default("0.0.0.0"),
   APP_PORT: numberFromEnv(3000, 1, 65535),
+  DASHBOARD_CORS_ORIGIN: z.string().min(1).default("*"),
   BOT_TOKEN: z.string().min(1, "BOT_TOKEN обязателен"),
   DATABASE_URL: z.string().min(1, "DATABASE_URL обязателен"),
   REDIS_URL: z.string().min(1, "REDIS_URL обязателен"),
@@ -65,6 +75,9 @@ const envSchema = z.object({
   ENABLE_DAILY_SUMMARIES: booleanFromEnv(false),
   ENABLE_WEEKLY_SUMMARIES: booleanFromEnv(false),
   MANUAL_CHECK_RATE_LIMIT_SECONDS: numberFromEnv(15, 1, 300),
+  TELEGRAM_STARS_MONTHLY_PRICE: numberFromEnv(99, 1, 100000),
+  PAYMENTS_TERMS_URL: optionalStringFromEnv(),
+  PAYMENTS_SUPPORT_URL: optionalStringFromEnv(),
 });
 
 export const env = envSchema.parse(process.env);

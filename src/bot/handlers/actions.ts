@@ -2,11 +2,11 @@ import { Telegraf } from "telegraf";
 
 import { AppServices } from "../../app/services";
 import { env } from "../../config/env";
-import { buildReportMessage } from "../messages/monitor-messages";
 import { BotContext } from "../../types/bot";
-import { SimpleRateLimiter } from "../middlewares/rate-limit";
 import { getCurrentUserOrThrow } from "../context";
 import { removeConfirmationKeyboard } from "../keyboards/monitors";
+import { SimpleRateLimiter } from "../middlewares/rate-limit";
+import { buildReportMessage } from "../messages/monitor-messages";
 import { handleAddMonitorCallback } from "../scenes/add-monitor.scene";
 import { handleSettingsCallback } from "../scenes/settings.scene";
 
@@ -69,7 +69,10 @@ export function registerActionHandlers(bot: Telegraf<BotContext>, services: AppS
       const monitorId = data.split(":")[1];
       const monitor = await services.monitorService.getMonitorForUser(currentUser.id, monitorId);
       await ctx.answerCbQuery();
-      await ctx.reply(`Удалить монитор "${monitor.name}"? История проверок сохранится.`, removeConfirmationKeyboard(monitor.id));
+      await ctx.reply(
+        `Удалить монитор "${monitor.name}"? История проверок сохранится.`,
+        removeConfirmationKeyboard(monitor.id),
+      );
       return;
     }
 
@@ -94,7 +97,7 @@ export function registerActionHandlers(bot: Telegraf<BotContext>, services: AppS
 
       await ctx.answerCbQuery("Запускаю проверку...");
 
-      const result = await services.monitorCheckService.runCheck(monitorId, "manual");
+      const result = await services.monitorCheckService.runManualCheck(monitorId);
 
       if (!result) {
         await ctx.reply("Не удалось выполнить ручную проверку.");

@@ -6,12 +6,12 @@ import { Redis } from "ioredis";
 import { env } from "../../config/env";
 import { logger } from "../../lib/logger";
 import { isHttpsUrl } from "../../lib/url";
+import { IncidentTransitionJobPayload, SslCheckJobPayload } from "../../queue/job-payloads";
 import { HttpChecker } from "../checks/http-checker";
 import { MonitorCheckExecutionResult } from "../checks/types";
 import { resolveIncidentState } from "../incidents/incident-state";
 import { jsonRulesSchema } from "./monitor.schemas";
 import { MonitorRepository, MonitorWithUser } from "./monitor.repository";
-import { IncidentTransitionJobPayload, SslCheckJobPayload } from "../../queue/job-payloads";
 
 export interface IncidentPublisherPort {
   publishIncidentTransition(payload: IncidentTransitionJobPayload): Promise<void>;
@@ -42,13 +42,7 @@ export class MonitorCheckService {
 
   private async acquireLock(monitorId: string): Promise<string | null> {
     const token = randomUUID();
-    const result = await this.redis.set(
-      this.lockKey(monitorId),
-      token,
-      "EX",
-      env.CHECK_LOCK_TTL_SECONDS,
-      "NX",
-    );
+    const result = await this.redis.set(this.lockKey(monitorId), token, "EX", env.CHECK_LOCK_TTL_SECONDS, "NX");
 
     return result === "OK" ? token : null;
   }
@@ -73,7 +67,10 @@ export class MonitorCheckService {
     return jsonRulesSchema.parse(value);
   }
 
-  async runCheck(monitorId: string, origin: "scheduled" | "manual"): Promise<MonitorCheckRunResult | null> {
+  async runMonitorCheck(
+    monitorId: string,
+    origin: "scheduled" | "manual",
+  ): Promise<MonitorCheckRunResult | null> {
     const lockToken = await this.acquireLock(monitorId);
 
     if (!lockToken) {
@@ -89,19 +86,19 @@ export class MonitorCheckService {
       }
 
       if (monitor.endsAt && monitor.endsAt <= new Date()) {
-        if (monitor.isActive || monitor.currentState !== MonitorState.PAUSED) {
+        if (!monitor.billingLocked || monitor.currentState !== MonitorState.PAUSED) {
           await this.monitorRepository.updateMonitor(monitor.id, {
-            isActive: false,
+            billingLocked: true,
             currentState: MonitorState.PAUSED,
             consecutiveFailures: 0,
           });
         }
 
-        logger.info({ monitorId, endsAt: monitor.endsAt.toISOString() }, "Monitor end date reached");
+        logger.info({ monitorId: monitor.id, endsAt: monitor.endsAt.toISOString() }, "Monitor end date reached");
         return null;
       }
 
-      if (origin === "scheduled" && (!monitor.isActive || monitor.currentState === "PAUSED")) {
+      if (origin === "scheduled" && (!monitor.isActive || monitor.currentState === MonitorState.PAUSED || monitor.billingLocked)) {
         return null;
       }
 
@@ -114,7 +111,7 @@ export class MonitorCheckService {
         jsonRules,
       });
 
-      const shouldKeepPausedState = origin === "manual" && monitor.currentState === "PAUSED";
+      const shouldKeepPausedState = origin === "manual" && monitor.currentState === MonitorState.PAUSED;
 
       const stateDecision = shouldKeepPausedState
         ? {
@@ -152,7 +149,7 @@ export class MonitorCheckService {
 
       if (stateDecision.transition !== "NONE") {
         await this.incidentPublisher.publishIncidentTransition({
-          monitorId: updatedMonitor.id,
+          monitorId: monitor.id,
           transition: stateDecision.transition,
           reason: result.errorMessage ?? "Неизвестная причина",
           checkedAt: result.checkedAt.toISOString(),
@@ -176,5 +173,9 @@ export class MonitorCheckService {
     } finally {
       await this.releaseLock(monitorId, lockToken);
     }
+  }
+
+  async runManualCheck(monitorId: string): Promise<MonitorCheckRunResult | null> {
+    return this.runMonitorCheck(monitorId, "manual");
   }
 }

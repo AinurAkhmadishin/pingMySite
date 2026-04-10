@@ -39,7 +39,7 @@ export function registerTextHandlers(bot: Telegraf<BotContext>, services: AppSer
     }
 
     if (text === BOT_MENU_TEXT.add) {
-      await startAddMonitorFlow(ctx);
+      await startAddMonitorFlow(ctx, services);
       return;
     }
 

@@ -1,35 +1,72 @@
 import { AppServices } from "../../app/services";
-import { DEFAULT_FAILURE_THRESHOLD, MONITOR_TERM_PLANS, MonitorTermKey } from "../../config/constants";
+import {
+  DEFAULT_FAILURE_THRESHOLD,
+  DEFAULT_RECOVERY_THRESHOLD,
+  MONITOR_TERM_PLANS,
+  MonitorTermKey,
+} from "../../config/constants";
 import { env } from "../../config/env";
-import { addDays, addMonths, formatDateTime } from "../../lib/date-time";
+import { addDays, formatDateTime } from "../../lib/date-time";
 import { normalizeUrl } from "../../lib/url";
 import { parseJsonRulesText } from "../../modules/checks/json-validator";
+import { ADD_MONITOR_FUNNEL_STEPS, AddMonitorFunnelStep } from "../../modules/funnels/funnel.constants";
+import { SubscriptionMonitorDraft } from "../../modules/subscriptions/subscription.service";
 import { BotContext } from "../../types/bot";
 import { getCurrentUserOrThrow } from "../context";
 import { intervalKeyboard, monitorTermKeyboard, sensitivityKeyboard, yesNoKeyboard } from "../keyboards/intervals";
 import { mainMenuKeyboard } from "../keyboards/main-menu";
+import { subscriptionCheckoutKeyboard } from "../keyboards/subscription";
+import { buildSubscriptionCheckoutMessage } from "../messages/subscription-messages";
 
 function resolveMonitorTerm(termKey: MonitorTermKey, from = new Date()) {
   const plan = MONITOR_TERM_PLANS.find((item) => item.key === termKey);
 
   if (!plan) {
-    throw new Error("\u041d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u044b\u0439 \u0442\u0430\u0440\u0438\u0444 \u043c\u043e\u043d\u0438\u0442\u043e\u0440\u0438\u043d\u0433\u0430.");
+    throw new Error("Неизвестный тариф мониторинга.");
   }
 
   return {
     plan,
-    endsAt: "days" in plan ? addDays(from, plan.days) : addMonths(from, plan.months),
+    endsAt: "days" in plan ? addDays(from, plan.days) : null,
   };
 }
 
-async function stopAddMonitorFlow(ctx: BotContext, message: string): Promise<void> {
+function buildSubscriptionDraft(flow: Extract<BotContext["session"]["flow"], { kind: "add" }>): SubscriptionMonitorDraft {
+  return {
+    name: flow.draft.name ?? "Без имени",
+    url: flow.draft.url ?? "",
+    intervalMinutes: flow.draft.intervalMinutes ?? 5,
+    timeoutMs: env.DEFAULT_TIMEOUT_MS,
+    requiredText: flow.draft.requiredText ?? null,
+    checkSsl: flow.draft.checkSsl,
+    checkJson: flow.draft.checkJson,
+    jsonRules: flow.draft.jsonRules ?? null,
+    failureThreshold: flow.draft.failureThreshold,
+    recoveryThreshold: DEFAULT_RECOVERY_THRESHOLD,
+  };
+}
+
+async function stopAddMonitorFlow(
+  ctx: BotContext,
+  services: AppServices,
+  userId: string,
+  funnelSessionId: string | undefined,
+  message: string,
+  step: AddMonitorFunnelStep = ADD_MONITOR_FUNNEL_STEPS.monitorCreationFailed,
+  payload?: Record<string, unknown>,
+): Promise<void> {
   ctx.session.flow = undefined;
+  await services.funnelService.stopAddMonitorSession(funnelSessionId, userId, step, payload);
   await ctx.reply(message, mainMenuKeyboard());
 }
 
-export async function startAddMonitorFlow(ctx: BotContext): Promise<void> {
+export async function startAddMonitorFlow(ctx: BotContext, services: AppServices): Promise<void> {
+  const currentUser = getCurrentUserOrThrow(ctx);
+  const funnelSession = await services.funnelService.startAddMonitorSession(currentUser.id);
+
   ctx.session.flow = {
     kind: "add",
+    funnelSessionId: funnelSession.id,
     step: "url",
     draft: {
       checkJson: false,
@@ -38,7 +75,7 @@ export async function startAddMonitorFlow(ctx: BotContext): Promise<void> {
     },
   };
 
-  await ctx.reply("\u0412\u0432\u0435\u0434\u0438\u0442\u0435 URL \u0441\u0430\u0439\u0442\u0430 \u0438\u043b\u0438 API, \u043a\u043e\u0442\u043e\u0440\u044b\u0439 \u043d\u0443\u0436\u043d\u043e \u043c\u043e\u043d\u0438\u0442\u043e\u0440\u0438\u0442\u044c.");
+  await ctx.reply("Введите URL сайта или API, который нужно мониторить.");
 }
 
 export async function handleAddMonitorText(ctx: BotContext, services: AppServices): Promise<boolean> {
@@ -48,34 +85,54 @@ export async function handleAddMonitorText(ctx: BotContext, services: AppService
     return false;
   }
 
+  const currentUser = getCurrentUserOrThrow(ctx);
   const text = ctx.message.text.trim();
 
   if (flow.step === "url") {
     try {
-      const currentUser = getCurrentUserOrThrow(ctx);
       const normalizedUrl = normalizeUrl(text);
       const existingMonitor = await services.monitorService.findExistingMonitorByUrl(currentUser.id, normalizedUrl);
 
       if (existingMonitor) {
         await stopAddMonitorFlow(
           ctx,
-          "\u042d\u0442\u043e\u0442 URL \u0443\u0436\u0435 \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d \u0432 \u043c\u043e\u043d\u0438\u0442\u043e\u0440\u0438\u043d\u0433. \u041e\u043f\u0440\u043e\u0441 \u043e\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d.",
+          services,
+          currentUser.id,
+          flow.funnelSessionId,
+          "Этот URL уже добавлен в мониторинг. Опрос остановлен.",
+          ADD_MONITOR_FUNNEL_STEPS.duplicateUrlBlocked,
+          {
+            url: normalizedUrl,
+          },
         );
         return true;
       }
 
       flow.draft.url = normalizedUrl;
       flow.step = "name";
-      await ctx.reply("\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043e\u0442\u043e\u0431\u0440\u0430\u0436\u0430\u0435\u043c\u043e\u0435 \u0438\u043c\u044f \u043f\u0440\u043e\u0435\u043a\u0442\u0430.");
+      await services.funnelService.setAddMonitorStep(
+        flow.funnelSessionId,
+        currentUser.id,
+        ADD_MONITOR_FUNNEL_STEPS.awaitingName,
+        {
+          url: normalizedUrl,
+        },
+      );
+      await ctx.reply("Введите отображаемое имя проекта.");
     } catch (error) {
-      const reason =
-        error instanceof Error
-          ? error.message
-          : "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u044b\u0439 \u0430\u0434\u0440\u0435\u0441 \u0441\u0430\u0439\u0442\u0430 \u0438 \u043f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0441\u043d\u043e\u0432\u0430.";
+      const reason = error instanceof Error ? error.message : "Введите корректный адрес сайта и попробуйте снова.";
 
       await stopAddMonitorFlow(
         ctx,
-        `\u0410\u0434\u0440\u0435\u0441 \u0441\u0430\u0439\u0442\u0430 \u043d\u0435\u0432\u0430\u043b\u0438\u0434\u043d\u044b\u0439. \u041e\u043f\u0440\u043e\u0441 \u043e\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d. ${reason}`.trim(),
+        services,
+        currentUser.id,
+        flow.funnelSessionId,
+        `Адрес сайта невалидный. Опрос остановлен. ${reason}`.trim(),
+        ADD_MONITOR_FUNNEL_STEPS.invalidUrl,
+        {
+          rawUrl: text,
+          reason,
+        },
       );
     }
 
@@ -85,17 +142,31 @@ export async function handleAddMonitorText(ctx: BotContext, services: AppService
   if (flow.step === "name") {
     flow.draft.name = text;
     flow.step = "interval";
-    await ctx.reply("\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0438\u043d\u0442\u0435\u0440\u0432\u0430\u043b \u043c\u043e\u043d\u0438\u0442\u043e\u0440\u0438\u043d\u0433\u0430.", intervalKeyboard("add-interval"));
+    await services.funnelService.setAddMonitorStep(
+      flow.funnelSessionId,
+      currentUser.id,
+      ADD_MONITOR_FUNNEL_STEPS.awaitingInterval,
+      {
+        url: flow.draft.url ?? null,
+        name: text,
+      },
+    );
+    await ctx.reply("Выберите интервал мониторинга.", intervalKeyboard("add-interval"));
     return true;
   }
 
   if (flow.step === "contentText") {
     flow.draft.requiredText = text;
     flow.step = "sslToggle";
-    await ctx.reply(
-      "\u0412\u043a\u043b\u044e\u0447\u0438\u0442\u044c SSL-\u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0443?",
-      yesNoKeyboard("add-ssl:yes", "add-ssl:no"),
+    await services.funnelService.setAddMonitorStep(
+      flow.funnelSessionId,
+      currentUser.id,
+      ADD_MONITOR_FUNNEL_STEPS.awaitingSslToggle,
+      {
+        requiredText: text,
+      },
     );
+    await ctx.reply("Включить SSL-проверку?", yesNoKeyboard("add-ssl:yes", "add-ssl:no"));
     return true;
   }
 
@@ -103,15 +174,30 @@ export async function handleAddMonitorText(ctx: BotContext, services: AppService
     try {
       flow.draft.jsonRules = parseJsonRulesText(text);
       flow.step = "sensitivity";
-      await ctx.reply(
-        "\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0447\u0443\u0432\u0441\u0442\u0432\u0438\u0442\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u044c \u043e\u043f\u043e\u0432\u0435\u0449\u0435\u043d\u0438\u0439.",
-        sensitivityKeyboard("add-sensitivity"),
+      await services.funnelService.setAddMonitorStep(
+        flow.funnelSessionId,
+        currentUser.id,
+        ADD_MONITOR_FUNNEL_STEPS.awaitingSensitivity,
+        {
+          jsonRulesCount: flow.draft.jsonRules.length,
+        },
       );
+      await ctx.reply("Выберите чувствительность оповещений.", sensitivityKeyboard("add-sensitivity"));
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Неверный формат JSON-правил.";
+
+      await services.funnelService.appendAddMonitorEvent(
+        flow.funnelSessionId,
+        currentUser.id,
+        ADD_MONITOR_FUNNEL_STEPS.invalidJsonRules,
+        {
+          input: text,
+          errorMessage,
+        },
+      );
+
       await ctx.reply(
-        `\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0440\u0430\u0441\u043f\u043e\u0437\u043d\u0430\u0442\u044c JSON-\u043f\u0440\u0430\u0432\u0438\u043b\u0430. \u0418\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0439\u0442\u0435 \u0444\u043e\u0440\u043c\u0430\u0442 "status = ok" \u0438\u043b\u0438 "data.version exists". ${
-          error instanceof Error ? error.message : ""
-        }`.trim(),
+        `Не удалось распознать JSON-правила. Используйте формат "status = ok" или "data.version exists". ${errorMessage}`.trim(),
       );
     }
 
@@ -128,14 +214,23 @@ export async function handleAddMonitorCallback(ctx: BotContext, services: AppSer
     return false;
   }
 
+  const currentUser = getCurrentUserOrThrow(ctx);
   const data = ctx.callbackQuery.data;
 
   if (flow.step === "interval" && data.startsWith("add-interval:")) {
     flow.draft.intervalMinutes = Number(data.split(":")[1]);
     flow.step = "contentToggle";
     await ctx.answerCbQuery();
+    await services.funnelService.setAddMonitorStep(
+      flow.funnelSessionId,
+      currentUser.id,
+      ADD_MONITOR_FUNNEL_STEPS.awaitingContentToggle,
+      {
+        intervalMinutes: flow.draft.intervalMinutes,
+      },
+    );
     await ctx.reply(
-      "\u041d\u0443\u0436\u043d\u0430 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 \u0441\u043e\u0434\u0435\u0440\u0436\u0438\u043c\u043e\u0433\u043e \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u044b \u043f\u043e \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u043e\u043c\u0443 \u0442\u0435\u043a\u0441\u0442\u0443?",
+      "Нужна проверка содержимого страницы по обязательному тексту?",
       yesNoKeyboard("add-content:yes", "add-content:no"),
     );
     return true;
@@ -148,14 +243,25 @@ export async function handleAddMonitorCallback(ctx: BotContext, services: AppSer
     await ctx.answerCbQuery();
 
     if (enabled) {
-      await ctx.reply(
-        "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0442\u0435\u043a\u0441\u0442, \u043a\u043e\u0442\u043e\u0440\u044b\u0439 \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u043e \u0434\u043e\u043b\u0436\u0435\u043d \u043f\u0440\u0438\u0441\u0443\u0442\u0441\u0442\u0432\u043e\u0432\u0430\u0442\u044c \u0432 \u043e\u0442\u0432\u0435\u0442\u0435.",
+      await services.funnelService.setAddMonitorStep(
+        flow.funnelSessionId,
+        currentUser.id,
+        ADD_MONITOR_FUNNEL_STEPS.awaitingContentText,
+        {
+          contentCheckEnabled: true,
+        },
       );
+      await ctx.reply("Введите текст, который обязательно должен присутствовать в ответе.");
     } else {
-      await ctx.reply(
-        "\u0412\u043a\u043b\u044e\u0447\u0438\u0442\u044c SSL-\u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0443?",
-        yesNoKeyboard("add-ssl:yes", "add-ssl:no"),
+      await services.funnelService.setAddMonitorStep(
+        flow.funnelSessionId,
+        currentUser.id,
+        ADD_MONITOR_FUNNEL_STEPS.awaitingSslToggle,
+        {
+          contentCheckEnabled: false,
+        },
       );
+      await ctx.reply("Включить SSL-проверку?", yesNoKeyboard("add-ssl:yes", "add-ssl:no"));
     }
 
     return true;
@@ -165,10 +271,15 @@ export async function handleAddMonitorCallback(ctx: BotContext, services: AppSer
     flow.draft.checkSsl = data.endsWith(":yes");
     flow.step = "jsonToggle";
     await ctx.answerCbQuery();
-    await ctx.reply(
-      "\u0412\u043a\u043b\u044e\u0447\u0438\u0442\u044c JSON-\u0432\u0430\u043b\u0438\u0434\u0430\u0446\u0438\u044e \u043e\u0442\u0432\u0435\u0442\u0430?",
-      yesNoKeyboard("add-json:yes", "add-json:no"),
+    await services.funnelService.setAddMonitorStep(
+      flow.funnelSessionId,
+      currentUser.id,
+      ADD_MONITOR_FUNNEL_STEPS.awaitingJsonToggle,
+      {
+        checkSsl: flow.draft.checkSsl,
+      },
     );
+    await ctx.reply("Включить JSON-валидацию ответа?", yesNoKeyboard("add-json:yes", "add-json:no"));
     return true;
   }
 
@@ -179,14 +290,25 @@ export async function handleAddMonitorCallback(ctx: BotContext, services: AppSer
     await ctx.answerCbQuery();
 
     if (enabled) {
-      await ctx.reply(
-        '\u0412\u0432\u0435\u0434\u0438\u0442\u0435 JSON-\u043f\u0440\u0430\u0432\u0438\u043b\u0430, \u043a\u0430\u0436\u0434\u043e\u0435 \u0441 \u043d\u043e\u0432\u043e\u0439 \u0441\u0442\u0440\u043e\u043a\u0438. \u041f\u0440\u0438\u043c\u0435\u0440:\nstatus = ok\ndata.version exists',
+      await services.funnelService.setAddMonitorStep(
+        flow.funnelSessionId,
+        currentUser.id,
+        ADD_MONITOR_FUNNEL_STEPS.awaitingJsonRules,
+        {
+          checkJson: true,
+        },
       );
+      await ctx.reply('Введите JSON-правила, каждое с новой строки. Пример:\nstatus = ok\ndata.version exists');
     } else {
-      await ctx.reply(
-        "\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0447\u0443\u0432\u0441\u0442\u0432\u0438\u0442\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u044c \u043e\u043f\u043e\u0432\u0435\u0449\u0435\u043d\u0438\u0439.",
-        sensitivityKeyboard("add-sensitivity"),
+      await services.funnelService.setAddMonitorStep(
+        flow.funnelSessionId,
+        currentUser.id,
+        ADD_MONITOR_FUNNEL_STEPS.awaitingSensitivity,
+        {
+          checkJson: false,
+        },
       );
+      await ctx.reply("Выберите чувствительность оповещений.", sensitivityKeyboard("add-sensitivity"));
     }
 
     return true;
@@ -196,15 +318,19 @@ export async function handleAddMonitorCallback(ctx: BotContext, services: AppSer
     flow.draft.failureThreshold = Number(data.split(":")[1]);
     flow.step = "duration";
     await ctx.answerCbQuery();
-    await ctx.reply(
-      "\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0442\u0430\u0440\u0438\u0444 \u043c\u043e\u043d\u0438\u0442\u043e\u0440\u0438\u043d\u0433\u0430.",
-      monitorTermKeyboard("add-duration"),
+    await services.funnelService.setAddMonitorStep(
+      flow.funnelSessionId,
+      currentUser.id,
+      ADD_MONITOR_FUNNEL_STEPS.awaitingTermSelection,
+      {
+        failureThreshold: flow.draft.failureThreshold,
+      },
     );
+    await ctx.reply("Выберите тариф мониторинга.", monitorTermKeyboard("add-duration"));
     return true;
   }
 
   if (flow.step === "duration" && data.startsWith("add-duration:")) {
-    const currentUser = getCurrentUserOrThrow(ctx);
     const termKey = data.split(":")[1] as MonitorTermKey;
 
     await ctx.answerCbQuery();
@@ -213,9 +339,49 @@ export async function handleAddMonitorCallback(ctx: BotContext, services: AppSer
       const { plan, endsAt } = resolveMonitorTerm(termKey);
       flow.draft.termKey = termKey;
 
+      if (plan.kind === "subscription") {
+        await services.funnelService.appendAddMonitorEvent(
+          flow.funnelSessionId,
+          currentUser.id,
+          ADD_MONITOR_FUNNEL_STEPS.subscriptionSelected,
+          {
+            termKey,
+          },
+        );
+
+        const activeSubscription = await services.subscriptionService.getActiveSubscriptionForUser(currentUser.id);
+
+        if (!activeSubscription) {
+          const checkout = await services.subscriptionService.createSubscriptionCheckout({
+            userId: currentUser.id,
+            chatId: String(ctx.chat?.id ?? currentUser.telegramId),
+            funnelSessionId: flow.funnelSessionId,
+            monitorDraft: buildSubscriptionDraft(flow),
+          });
+
+          ctx.session.flow = undefined;
+
+          await ctx.reply(
+            buildSubscriptionCheckoutMessage(checkout.amountStars),
+            subscriptionCheckoutKeyboard(checkout.paymentUrl),
+          );
+
+          return true;
+        }
+      } else {
+        await services.funnelService.appendAddMonitorEvent(
+          flow.funnelSessionId,
+          currentUser.id,
+          ADD_MONITOR_FUNNEL_STEPS.trialSelected,
+          {
+            termKey,
+          },
+        );
+      }
+
       const monitor = await services.monitorService.createMonitor({
         userId: currentUser.id,
-        name: flow.draft.name ?? "\u0411\u0435\u0437 \u0438\u043c\u0435\u043d\u0438",
+        name: flow.draft.name ?? "Без имени",
         url: flow.draft.url ?? "",
         termKind: plan.kind === "trial" ? "TRIAL" : "SUBSCRIPTION",
         intervalMinutes: flow.draft.intervalMinutes ?? 5,
@@ -229,33 +395,45 @@ export async function handleAddMonitorCallback(ctx: BotContext, services: AppSer
       });
 
       ctx.session.flow = undefined;
+      await services.funnelService.completeAddMonitorSession(
+        flow.funnelSessionId,
+        currentUser.id,
+        ADD_MONITOR_FUNNEL_STEPS.monitorCreated,
+        {
+          monitorId: monitor.id,
+          termKey,
+          termKind: plan.kind,
+          endsAt: (monitor.endsAt ?? endsAt)?.toISOString() ?? null,
+        },
+      );
 
       await ctx.reply(
         [
-          "\u041c\u043e\u043d\u0438\u0442\u043e\u0440 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d.",
-          `\u041f\u0440\u043e\u0435\u043a\u0442: ${monitor.name}`,
-          `\u0422\u0430\u0440\u0438\u0444: ${plan.label}`,
+          "Монитор сохранен.",
+          `Проект: ${monitor.name}`,
+          `Тариф: ${plan.label}`,
           `URL: ${monitor.url}`,
-          `\u0418\u043d\u0442\u0435\u0440\u0432\u0430\u043b: ${monitor.intervalMinutes} \u043c\u0438\u043d`,
-          `\u041c\u043e\u043d\u0438\u0442\u043e\u0440\u0438\u043d\u0433 \u0434\u043e: ${formatDateTime(monitor.endsAt ?? endsAt, currentUser.timezone)}`,
-          `SSL: ${monitor.checkSsl ? "\u0434\u0430" : "\u043d\u0435\u0442"}`,
-          `JSON: ${monitor.checkJson ? "\u0434\u0430" : "\u043d\u0435\u0442"}`,
+          `Интервал: ${monitor.intervalMinutes} мин`,
+          `Мониторинг до: ${formatDateTime(monitor.endsAt ?? endsAt ?? new Date(), currentUser.timezone)}`,
+          `SSL: ${monitor.checkSsl ? "да" : "нет"}`,
+          `JSON: ${monitor.checkJson ? "да" : "нет"}`,
         ].join("\n"),
         mainMenuKeyboard(),
       );
     } catch (error) {
-      await ctx.reply(
-        `\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0441\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u043c\u043e\u043d\u0438\u0442\u043e\u0440. ${
-          error instanceof Error ? error.message : ""
-        }`.trim(),
+      await services.funnelService.appendAddMonitorEvent(
+        flow.funnelSessionId,
+        currentUser.id,
+        ADD_MONITOR_FUNNEL_STEPS.monitorCreationFailed,
+        {
+          termKey,
+          errorMessage: error instanceof Error ? error.message : "Неизвестная ошибка",
+        },
       );
+
+      await ctx.reply(`Не удалось сохранить монитор. ${error instanceof Error ? error.message : ""}`.trim());
     }
 
-    return true;
-  }
-
-  if (flow.step === "duration" && data.startsWith("add-duration-disabled:")) {
-    await ctx.answerCbQuery("\u041e\u043f\u043b\u0430\u0442\u0430 \u043f\u043e\u0434\u043f\u0438\u0441\u043a\u0438 \u043f\u043e\u043a\u0430 \u043d\u0435 \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u0430.");
     return true;
   }
 

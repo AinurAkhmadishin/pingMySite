@@ -2,11 +2,12 @@ import { Telegraf } from "telegraf";
 
 import { AppServices } from "../../app/services";
 import { BOT_MENU_TEXT } from "../../config/constants";
+import { env } from "../../config/env";
 import { BotContext } from "../../types/bot";
 import { getCurrentUserOrThrow } from "../context";
-import { intervalKeyboard } from "../keyboards/intervals";
 import { mainMenuKeyboard } from "../keyboards/main-menu";
 import { monitorSelectionKeyboard } from "../keyboards/monitors";
+import { subscriptionCheckoutKeyboard } from "../keyboards/subscription";
 import {
   buildHelpMessage,
   buildMonitorListMessage,
@@ -14,6 +15,11 @@ import {
   buildStartMessage,
   buildStatusMessage,
 } from "../messages/monitor-messages";
+import {
+  buildPaymentSupportMessage,
+  buildSubscriptionStatusMessage,
+  buildTermsMessage,
+} from "../messages/subscription-messages";
 import { startAddMonitorFlow } from "../scenes/add-monitor.scene";
 
 async function withUserMonitors(
@@ -113,10 +119,45 @@ export async function handleCheckNowCommand(ctx: BotContext, services: AppServic
   await ctx.reply("Какой монитор проверить прямо сейчас?", monitorSelectionKeyboard(monitors, "check"));
 }
 
+export async function handleSubscriptionCommand(ctx: BotContext, services: AppServices): Promise<void> {
+  const currentUser = getCurrentUserOrThrow(ctx);
+  const subscription = await services.subscriptionService.getSubscriptionForUser(currentUser.id);
+  const activeSubscription = await services.subscriptionService.getActiveSubscriptionForUser(currentUser.id);
+
+  if (activeSubscription) {
+    await ctx.reply(
+      buildSubscriptionStatusMessage(activeSubscription, currentUser.timezone, env.TELEGRAM_STARS_MONTHLY_PRICE),
+      mainMenuKeyboard(),
+    );
+    return;
+  }
+
+  const checkout = await services.subscriptionService.createSubscriptionCheckout({
+    userId: currentUser.id,
+    chatId: String(ctx.chat?.id ?? currentUser.telegramId),
+  });
+
+  const statusMessage = buildSubscriptionStatusMessage(subscription, currentUser.timezone, checkout.amountStars);
+  await ctx.reply(
+    `${statusMessage}\n\nЧтобы подключить подписку, оплатите счет по кнопке ниже.`,
+    subscriptionCheckoutKeyboard(checkout.paymentUrl),
+  );
+}
+
+export async function handleTermsCommand(ctx: BotContext): Promise<void> {
+  const suffix = env.PAYMENTS_TERMS_URL ? `\n\nСсылка: ${env.PAYMENTS_TERMS_URL}` : "";
+  await ctx.reply(`${buildTermsMessage()}${suffix}`);
+}
+
+export async function handlePaySupportCommand(ctx: BotContext): Promise<void> {
+  const suffix = env.PAYMENTS_SUPPORT_URL ? `\n\nСсылка: ${env.PAYMENTS_SUPPORT_URL}` : "";
+  await ctx.reply(`${buildPaymentSupportMessage()}${suffix}`);
+}
+
 export function registerCommands(bot: Telegraf<BotContext>, services: AppServices): void {
   bot.start(handleStartCommand);
   bot.command("help", (ctx) => handleHelpCommand(ctx));
-  bot.command("add", (ctx) => startAddMonitorFlow(ctx));
+  bot.command("add", (ctx) => startAddMonitorFlow(ctx, services));
   bot.command("list", (ctx) => handleListCommand(ctx, services));
   bot.command("status", (ctx) => handleStatusCommand(ctx, services));
   bot.command("report", (ctx) => handleReportCommand(ctx, services));
@@ -125,6 +166,9 @@ export function registerCommands(bot: Telegraf<BotContext>, services: AppService
   bot.command("remove", (ctx) => handleRemoveCommand(ctx, services));
   bot.command("settings", (ctx) => handleSettingsCommand(ctx, services));
   bot.command("checknow", (ctx) => handleCheckNowCommand(ctx, services));
+  bot.command("subscription", (ctx) => handleSubscriptionCommand(ctx, services));
+  bot.command("terms", (ctx) => handleTermsCommand(ctx));
+  bot.command("paysupport", (ctx) => handlePaySupportCommand(ctx));
 
   void bot.telegram.setMyCommands([
     { command: "start", description: "Главное меню" },
@@ -138,5 +182,8 @@ export function registerCommands(bot: Telegraf<BotContext>, services: AppService
     { command: "remove", description: "Удалить монитор" },
     { command: "settings", description: "Изменить настройки" },
     { command: "checknow", description: "Проверить монитор сейчас" },
+    { command: "subscription", description: "Подписка и Stars" },
+    { command: "terms", description: "Условия оплаты" },
+    { command: "paysupport", description: "Поддержка по оплате" },
   ]);
 }

@@ -13,6 +13,11 @@ export interface MonitorListFilters {
   onlyActive?: boolean;
 }
 
+export interface MonitorScheduleTarget {
+  monitorId: string;
+  intervalMinutes: number;
+}
+
 export class MonitorRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -80,6 +85,7 @@ export class MonitorRepository {
     return this.prisma.monitor.findMany({
       where: {
         isActive: true,
+        billingLocked: false,
         deletedAt: null,
         OR: [
           {
@@ -99,9 +105,11 @@ export class MonitorRepository {
     });
   }
 
-  async createMonitor(data: Prisma.MonitorUncheckedCreateInput): Promise<MonitorWithUser> {
+  async createMonitor(
+    monitorData: Prisma.MonitorUncheckedCreateInput,
+  ): Promise<MonitorWithUser> {
     return this.prisma.monitor.create({
-      data,
+      data: monitorData,
       ...monitorWithUserArgs,
     });
   }
@@ -119,6 +127,80 @@ export class MonitorRepository {
     });
   }
 
+  async listActiveMonitorSchedules(): Promise<MonitorScheduleTarget[]> {
+    const schedules = await this.prisma.monitor.findMany({
+      where: {
+        isActive: true,
+        billingLocked: false,
+        deletedAt: null,
+        OR: [
+          {
+            endsAt: null,
+          },
+          {
+            endsAt: {
+              gt: new Date(),
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+        intervalMinutes: true,
+      },
+    });
+
+    return schedules.map((schedule) => ({
+      monitorId: schedule.id,
+      intervalMinutes: schedule.intervalMinutes,
+    }));
+  }
+
+  async syncSubscriptionMonitorAccess(userId: string, endsAt: Date): Promise<void> {
+    await this.prisma.monitor.updateMany({
+      where: {
+        userId,
+        termKind: MonitorTermKind.SUBSCRIPTION,
+        deletedAt: null,
+      },
+      data: {
+        endsAt,
+        billingLocked: false,
+      },
+    });
+  }
+
+  async listActiveSubscriptionMonitorSchedules(userId: string): Promise<MonitorScheduleTarget[]> {
+    const schedules = await this.prisma.monitor.findMany({
+      where: {
+        userId,
+        termKind: MonitorTermKind.SUBSCRIPTION,
+        isActive: true,
+        billingLocked: false,
+        deletedAt: null,
+        OR: [
+          {
+            endsAt: null,
+          },
+          {
+            endsAt: {
+              gt: new Date(),
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+        intervalMinutes: true,
+      },
+    });
+
+    return schedules.map((schedule) => ({
+      monitorId: schedule.id,
+      intervalMinutes: schedule.intervalMinutes,
+    }));
+  }
+
   async createCheckResult(data: Prisma.CheckResultUncheckedCreateInput): Promise<void> {
     await this.prisma.checkResult.create({
       data,
@@ -129,6 +211,7 @@ export class MonitorRepository {
     return this.updateMonitor(monitorId, {
       deletedAt,
       isActive: false,
+      billingLocked: false,
       currentState: MonitorState.PAUSED,
     });
   }

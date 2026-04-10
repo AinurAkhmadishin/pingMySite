@@ -18,6 +18,7 @@ export interface AddMonitorDraft {
 
 export interface AddMonitorFlow {
   kind: "add";
+  funnelSessionId: string;
   step:
     | "url"
     | "name"
@@ -35,7 +36,7 @@ export interface AddMonitorFlow {
 export interface SettingsFlow {
   kind: "settings";
   monitorId: string;
-  field: "timeout" | "requiredText" | "jsonRules";
+  field: "requiredText" | "jsonRules";
 }
 
 export type BotFlow = AddMonitorFlow | SettingsFlow;

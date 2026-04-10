@@ -4,16 +4,20 @@ import { formatDateTime, formatDurationSeconds, formatPercent } from "../../lib/
 import { MonitorWithUser } from "../../modules/monitors/monitor.repository";
 import { MonitorReport } from "../../modules/reports/report.service";
 
-function formatState(monitor: MonitorWithUser): string {
-  if (!monitor.isActive || monitor.currentState === MonitorState.PAUSED) {
+function formatState(state: MonitorState, isActive: boolean, billingLocked = false): string {
+  if (billingLocked) {
+    return "EXPIRED";
+  }
+
+  if (!isActive || state === MonitorState.PAUSED) {
     return "PAUSED";
   }
 
-  if (monitor.currentState === MonitorState.DOWN) {
+  if (state === MonitorState.DOWN) {
     return "DOWN";
   }
 
-  if (monitor.currentState === MonitorState.UP) {
+  if (state === MonitorState.UP) {
     return "UP";
   }
 
@@ -21,52 +25,59 @@ function formatState(monitor: MonitorWithUser): string {
 }
 
 function formatMonitorEndDate(endsAt: Date | null | undefined, timeZone: string): string {
-  return endsAt ? formatDateTime(endsAt, timeZone) : "\u0431\u0435\u0437 \u0441\u0440\u043e\u043a\u0430";
+  return endsAt ? formatDateTime(endsAt, timeZone) : "без срока";
 }
 
 export function buildStartMessage(firstName?: string | null): string {
   return [
-    `\u041f\u0440\u0438\u0432\u0435\u0442${firstName ? `, ${firstName}` : ""}!`,
-    "\u042f Ping My Site Bot \u0438 \u0441\u043b\u0435\u0436\u0443 \u0437\u0430 \u0434\u043e\u0441\u0442\u0443\u043f\u043d\u043e\u0441\u0442\u044c\u044e \u0441\u0430\u0439\u0442\u043e\u0432 \u0438 API \u043f\u0440\u044f\u043c\u043e \u0432 Telegram.",
-    "\u0412\u044b \u043c\u043e\u0436\u0435\u0442\u0435 \u0434\u043e\u0431\u0430\u0432\u043b\u044f\u0442\u044c \u043c\u043e\u043d\u0438\u0442\u043e\u0440\u044b, \u043f\u043e\u043b\u0443\u0447\u0430\u0442\u044c \u0443\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u044f \u043e \u0441\u0431\u043e\u044f\u0445, \u0441\u043c\u043e\u0442\u0440\u0435\u0442\u044c uptime, \u0438\u0441\u0442\u043e\u0440\u0438\u044e \u0438\u043d\u0446\u0438\u0434\u0435\u043d\u0442\u043e\u0432 \u0438 \u043a\u043e\u043d\u0442\u0440\u043e\u043b\u0438\u0440\u043e\u0432\u0430\u0442\u044c SSL.",
-    "\u041d\u0430\u0447\u043d\u0438\u0442\u0435 \u0441 \u043a\u043e\u043c\u0430\u043d\u0434\u044b /add \u0438\u043b\u0438 \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0439\u0442\u0435 \u043a\u043d\u043e\u043f\u043a\u0438 \u043c\u0435\u043d\u044e \u043d\u0438\u0436\u0435.",
+    `Привет${firstName ? `, ${firstName}` : ""}!`,
+    "Я Ping My Site Bot и слежу за доступностью сайтов и API прямо в Telegram.",
+    "Вы можете добавлять мониторы, получать уведомления о сбоях, смотреть uptime, историю инцидентов и контролировать SSL.",
+    "Начните с команды /add или используйте кнопки меню ниже.",
   ].join("\n\n");
 }
 
 export function buildHelpMessage(): string {
   return [
-    "\u0414\u043e\u0441\u0442\u0443\u043f\u043d\u044b\u0435 \u043a\u043e\u043c\u0430\u043d\u0434\u044b:",
-    "/start \u2014 \u043f\u0440\u0438\u0432\u0435\u0442\u0441\u0442\u0432\u0438\u0435 \u0438 \u0433\u043b\u0430\u0432\u043d\u043e\u0435 \u043c\u0435\u043d\u044e",
-    "/help \u2014 \u0441\u043f\u0438\u0441\u043e\u043a \u0432\u043e\u0437\u043c\u043e\u0436\u043d\u043e\u0441\u0442\u0435\u0439",
-    "/add \u2014 \u0434\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0441\u0430\u0439\u0442 \u0438\u043b\u0438 API \u043d\u0430 \u043c\u043e\u043d\u0438\u0442\u043e\u0440\u0438\u043d\u0433",
-    "/list \u2014 \u0441\u043f\u0438\u0441\u043e\u043a \u0432\u0441\u0435\u0445 \u043c\u043e\u043d\u0438\u0442\u043e\u0440\u043e\u0432",
-    "/status \u2014 \u0442\u0435\u043a\u0443\u0449\u0438\u0439 \u0441\u0442\u0430\u0442\u0443\u0441 \u0432\u0441\u0435\u0445 \u043c\u043e\u043d\u0438\u0442\u043e\u0440\u043e\u0432",
-    "/report \u2014 uptime \u0438 \u0438\u0441\u0442\u043e\u0440\u0438\u044f \u0438\u043d\u0446\u0438\u0434\u0435\u043d\u0442\u043e\u0432 \u043f\u043e \u043c\u043e\u043d\u0438\u0442\u043e\u0440\u0443",
-    "/pause \u2014 \u043f\u043e\u0441\u0442\u0430\u0432\u0438\u0442\u044c \u043c\u043e\u043d\u0438\u0442\u043e\u0440 \u043d\u0430 \u043f\u0430\u0443\u0437\u0443",
-    "/resume \u2014 \u0432\u043e\u0437\u043e\u0431\u043d\u043e\u0432\u0438\u0442\u044c \u043c\u043e\u043d\u0438\u0442\u043e\u0440\u0438\u043d\u0433",
-    "/remove \u2014 \u0443\u0434\u0430\u043b\u0438\u0442\u044c \u043c\u043e\u043d\u0438\u0442\u043e\u0440",
-    "/settings \u2014 \u0438\u0437\u043c\u0435\u043d\u0438\u0442\u044c \u0438\u043d\u0442\u0435\u0440\u0432\u0430\u043b, \u0442\u0430\u0439\u043c\u0430\u0443\u0442, \u0442\u0435\u043a\u0441\u0442, JSON-\u043f\u0440\u0430\u0432\u0438\u043b\u0430, \u0447\u0443\u0432\u0441\u0442\u0432\u0438\u0442\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u044c \u0438 SSL",
-    "/checknow \u2014 \u0432\u044b\u043f\u043e\u043b\u043d\u0438\u0442\u044c \u043d\u0435\u043c\u0435\u0434\u043b\u0435\u043d\u043d\u0443\u044e \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0443",
+    "Доступные команды:",
+    "/start — приветствие и главное меню",
+    "/help — список возможностей",
+    "/add — добавить сайт или API на мониторинг",
+    "/list — список всех мониторов",
+    "/status — текущий статус всех мониторов",
+    "/report — uptime и история инцидентов по монитору",
+    "/pause — поставить монитор на паузу",
+    "/resume — возобновить мониторинг",
+    "/remove — удалить монитор",
+    "/settings — изменить интервал, текст, JSON-правила, чувствительность и SSL",
+    "/checknow — выполнить немедленную проверку",
+    "/subscription — статус подписки и оплата через Stars",
+    "/terms — условия оплаты",
+    "/paysupport — поддержка по оплате",
     "",
-    "\u041f\u043e\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u044e\u0442\u0441\u044f: HTTP/HTTPS-\u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0438, \u043a\u043e\u043d\u0442\u0440\u043e\u043b\u044c \u0442\u0435\u043a\u0441\u0442\u0430 \u043d\u0430 \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0435, JSON-\u0432\u0430\u043b\u0438\u0434\u0430\u0446\u0438\u044f, SSL-\u0443\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u044f \u0438 \u0437\u0430\u0449\u0438\u0442\u0430 \u043e\u0442 \u043b\u043e\u0436\u043d\u044b\u0445 \u0441\u0440\u0430\u0431\u0430\u0442\u044b\u0432\u0430\u043d\u0438\u0439 \u043f\u043e 3 \u043f\u043e\u0441\u043b\u0435\u0434\u043e\u0432\u0430\u0442\u0435\u043b\u044c\u043d\u044b\u043c \u043e\u0448\u0438\u0431\u043a\u0430\u043c.",
+    "Тарифы:",
+    "1. Пробный период 14 дней",
+    "2. Подписка на 30 дней через Telegram Stars",
+    "",
+    "Поддерживаются: HTTP/HTTPS-проверки, контроль текста на странице, JSON-валидация, SSL-уведомления и антифлаппинг.",
   ].join("\n");
 }
 
 export function buildMonitorListMessage(monitors: MonitorWithUser[]): string {
   if (monitors.length === 0) {
-    return "\u0423 \u0432\u0430\u0441 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442 \u043c\u043e\u043d\u0438\u0442\u043e\u0440\u043e\u0432. \u0418\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0439\u0442\u0435 /add, \u0447\u0442\u043e\u0431\u044b \u0434\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043f\u0435\u0440\u0432\u044b\u0439 \u0441\u0430\u0439\u0442.";
+    return "У вас пока нет мониторов. Используйте /add, чтобы добавить первый сайт.";
   }
 
   return [
-    "\u0412\u0430\u0448\u0438 \u043c\u043e\u043d\u0438\u0442\u043e\u0440\u044b:",
+    "Ваши мониторы:",
     ...monitors.map((monitor, index) =>
       [
         `${index + 1}. ${monitor.name}`,
         `URL: ${monitor.url}`,
-        `\u0421\u043e\u0441\u0442\u043e\u044f\u043d\u0438\u0435: ${formatState(monitor)}`,
-        `\u0418\u043d\u0442\u0435\u0440\u0432\u0430\u043b: ${monitor.intervalMinutes} \u043c\u0438\u043d`,
-        `\u041c\u043e\u043d\u0438\u0442\u043e\u0440\u0438\u043d\u0433 \u0434\u043e: ${formatMonitorEndDate(monitor.endsAt, monitor.user.timezone)}`,
-        `\u0420\u0435\u0436\u0438\u043c: ${monitor.isActive ? "\u0430\u043a\u0442\u0438\u0432\u0435\u043d" : "\u043f\u0430\u0443\u0437\u0430"}`,
+        `Состояние: ${formatState(monitor.currentState, monitor.isActive, monitor.billingLocked)}`,
+        `Интервал: ${monitor.intervalMinutes} мин`,
+        `Мониторинг до: ${formatMonitorEndDate(monitor.endsAt, monitor.user.timezone)}`,
+        `Режим: ${monitor.isActive ? "активен" : "пауза"}`,
       ].join("\n"),
     ),
   ].join("\n\n");
@@ -74,62 +85,63 @@ export function buildMonitorListMessage(monitors: MonitorWithUser[]): string {
 
 export function buildStatusMessage(monitors: MonitorWithUser[]): string {
   if (monitors.length === 0) {
-    return "\u0421\u0442\u0430\u0442\u0443\u0441\u043e\u0432 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442: \u0441\u043d\u0430\u0447\u0430\u043b\u0430 \u0434\u043e\u0431\u0430\u0432\u044c\u0442\u0435 \u0445\u043e\u0442\u044f \u0431\u044b \u043e\u0434\u0438\u043d \u043c\u043e\u043d\u0438\u0442\u043e\u0440 \u0447\u0435\u0440\u0435\u0437 /add.";
+    return "Статусов пока нет: сначала добавьте хотя бы один монитор через /add.";
   }
 
   return [
-    "\u0422\u0435\u043a\u0443\u0449\u0438\u0439 \u0441\u0442\u0430\u0442\u0443\u0441 \u043c\u043e\u043d\u0438\u0442\u043e\u0440\u043e\u0432:",
+    "Текущий статус мониторов:",
     ...monitors.map((monitor) =>
       [
-        `${monitor.name} \u2014 ${formatState(monitor)}`,
-        `\u041e\u0442\u0432\u0435\u0442: ${monitor.lastResponseTimeMs ?? "n/a"} ms`,
-        `\u041f\u043e\u0441\u043b\u0435\u0434\u043d\u044f\u044f \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0430: ${
-          monitor.lastCheckedAt ? formatDateTime(monitor.lastCheckedAt, monitor.user.timezone) : "\u0435\u0449\u0435 \u043d\u0435 \u0432\u044b\u043f\u043e\u043b\u043d\u044f\u043b\u0430\u0441\u044c"
+        `${monitor.name} — ${formatState(monitor.currentState, monitor.isActive, monitor.billingLocked)}`,
+        `URL: ${monitor.url}`,
+        `Ответ: ${monitor.lastResponseTimeMs ?? "n/a"} ms`,
+        `Последняя проверка: ${
+          monitor.lastCheckedAt ? formatDateTime(monitor.lastCheckedAt, monitor.user.timezone) : "еще не выполнялась"
         }`,
-        `HTTP-\u043a\u043e\u0434: ${monitor.lastStatusCode ?? "n/a"}`,
-      ].join("\n"),
+        `HTTP-код: ${monitor.lastStatusCode ?? "n/a"}`,
+        `Мониторинг до: ${formatMonitorEndDate(monitor.endsAt, monitor.user.timezone)}`,
+        monitor.lastErrorMessage ? `Ошибка: ${monitor.lastErrorMessage}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
     ),
   ].join("\n\n");
 }
 
 export function buildReportMessage(report: MonitorReport, timezone: string): string {
-  const windows = report.windows.map((window) => {
-    return `${window.label}: ${formatPercent(window.uptimePercent)} (${window.successfulChecks}/${window.totalChecks})`;
-  });
+  const windows = report.windows.map(
+    (window) => `${window.label}: ${formatPercent(window.uptimePercent)} (${window.successfulChecks}/${window.totalChecks})`,
+  );
 
   const recentIncidents =
     report.recentIncidents.length > 0
       ? report.recentIncidents.map((incident, index) => {
           const duration =
-            typeof incident.durationSeconds === "number" ? formatDurationSeconds(incident.durationSeconds) : "\u0432 \u043f\u0440\u043e\u0446\u0435\u0441\u0441\u0435";
+            typeof incident.durationSeconds === "number" ? formatDurationSeconds(incident.durationSeconds) : "в процессе";
 
           return [
             `${index + 1}. ${incident.status}`,
-            `\u041f\u0440\u0438\u0447\u0438\u043d\u0430: ${incident.reason}`,
-            `\u041d\u0430\u0447\u0430\u043b\u043e: ${formatDateTime(incident.startedAt, timezone)}`,
-            `\u041e\u043a\u043e\u043d\u0447\u0430\u043d\u0438\u0435: ${
-              incident.resolvedAt ? formatDateTime(incident.resolvedAt, timezone) : "\u043d\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043d"
-            }`,
-            `\u0414\u043b\u0438\u0442\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u044c: ${duration}`,
+            `Причина: ${incident.reason}`,
+            `Начало: ${formatDateTime(incident.startedAt, timezone)}`,
+            `Окончание: ${incident.resolvedAt ? formatDateTime(incident.resolvedAt, timezone) : "не завершен"}`,
+            `Длительность: ${duration}`,
           ].join("\n");
         })
-      : ["\u0418\u0441\u0442\u043e\u0440\u0438\u044f \u0438\u043d\u0446\u0438\u0434\u0435\u043d\u0442\u043e\u0432 \u043f\u043e\u043a\u0430 \u043f\u0443\u0441\u0442\u0430."];
+      : ["История инцидентов пока пустая."];
 
   return [
-    `\u041e\u0442\u0447\u0435\u0442 \u043f\u043e \u043c\u043e\u043d\u0438\u0442\u043e\u0440\u0443: ${report.monitorName}`,
+    `Отчет по монитору: ${report.monitorName}`,
     `URL: ${report.url}`,
-    `\u0422\u0435\u043a\u0443\u0449\u0435\u0435 \u0441\u043e\u0441\u0442\u043e\u044f\u043d\u0438\u0435: ${report.currentState}`,
-    `\u041c\u043e\u043d\u0438\u0442\u043e\u0440\u0438\u043d\u0433 \u0434\u043e: ${formatMonitorEndDate(report.endsAt, timezone)}`,
+    `Текущее состояние: ${report.currentState}`,
+    `Мониторинг до: ${formatMonitorEndDate(report.endsAt, timezone)}`,
     ...windows,
-    `\u0421\u0440\u0435\u0434\u043d\u0435\u0435 \u0432\u0440\u0435\u043c\u044f \u043e\u0442\u0432\u0435\u0442\u0430: ${report.averageResponseTimeMs ?? "n/a"} ms`,
-    `\u0412\u0441\u0435\u0433\u043e \u0438\u043d\u0446\u0438\u0434\u0435\u043d\u0442\u043e\u0432: ${report.totalIncidents}`,
-    `\u041f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0439 \u0438\u043d\u0446\u0438\u0434\u0435\u043d\u0442: ${report.lastIncidentReason ?? "\u043d\u0435\u0442"}`,
-    report.lastIncidentStartedAt ? `\u041d\u0430\u0447\u0430\u043b\u0441\u044f: ${formatDateTime(report.lastIncidentStartedAt, timezone)}` : "",
-    report.openIncident
-      ? "\u0421\u0435\u0439\u0447\u0430\u0441 \u0435\u0441\u0442\u044c \u043e\u0442\u043a\u0440\u044b\u0442\u044b\u0439 \u0438\u043d\u0446\u0438\u0434\u0435\u043d\u0442."
-      : "\u041e\u0442\u043a\u0440\u044b\u0442\u044b\u0445 \u0438\u043d\u0446\u0438\u0434\u0435\u043d\u0442\u043e\u0432 \u043d\u0435\u0442.",
+    `Среднее время ответа: ${report.averageResponseTimeMs ?? "n/a"} ms`,
+    `Всего инцидентов: ${report.totalIncidents}`,
+    `Последний инцидент: ${report.lastIncidentReason ?? "нет"}`,
+    report.lastIncidentStartedAt ? `Начался: ${formatDateTime(report.lastIncidentStartedAt, timezone)}` : "",
+    report.openIncident ? "Сейчас есть открытый инцидент." : "Открытых инцидентов нет.",
     "",
-    "\u041f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0435 \u0438\u043d\u0446\u0438\u0434\u0435\u043d\u0442\u044b:",
+    "Последние инциденты:",
     ...recentIncidents,
   ]
     .filter(Boolean)
@@ -138,13 +150,12 @@ export function buildReportMessage(report: MonitorReport, timezone: string): str
 
 export function buildSettingsMenuMessage(monitor: MonitorWithUser): string {
   return [
-    `\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438 \u043c\u043e\u043d\u0438\u0442\u043e\u0440\u0430: ${monitor.name}`,
-    `\u0418\u043d\u0442\u0435\u0440\u0432\u0430\u043b: ${monitor.intervalMinutes} \u043c\u0438\u043d`,
-    `\u041c\u043e\u043d\u0438\u0442\u043e\u0440\u0438\u043d\u0433 \u0434\u043e: ${formatMonitorEndDate(monitor.endsAt, monitor.user.timezone)}`,
-    `\u0422\u0430\u0439\u043c\u0430\u0443\u0442: ${monitor.timeoutMs} ms`,
-    `\u041e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u044b\u0439 \u0442\u0435\u043a\u0441\u0442: ${monitor.requiredText ?? "\u043d\u0435 \u0437\u0430\u0434\u0430\u043d"}`,
-    `JSON-\u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0430: ${monitor.checkJson ? "\u0432\u043a\u043b\u044e\u0447\u0435\u043d\u0430" : "\u0432\u044b\u043a\u043b\u044e\u0447\u0435\u043d\u0430"}`,
-    `\u0427\u0443\u0432\u0441\u0442\u0432\u0438\u0442\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u044c: ${monitor.failureThreshold} \u043e\u0448\u0438\u0431\u043a\u0438 \u043f\u043e\u0434\u0440\u044f\u0434`,
-    `SSL-\u0443\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u044f: ${monitor.checkSsl ? "\u0432\u043a\u043b\u044e\u0447\u0435\u043d\u044b" : "\u0432\u044b\u043a\u043b\u044e\u0447\u0435\u043d\u044b"}`,
+    `Настройки монитора: ${monitor.name}`,
+    `Интервал: ${monitor.intervalMinutes} мин`,
+    `Мониторинг до: ${formatMonitorEndDate(monitor.endsAt, monitor.user.timezone)}`,
+    `Обязательный текст: ${monitor.requiredText ?? "не задан"}`,
+    `JSON-проверка: ${monitor.checkJson ? "включена" : "выключена"}`,
+    `Чувствительность: ${monitor.failureThreshold} ошибки подряд`,
+    `SSL-уведомления: ${monitor.checkSsl ? "включены" : "выключены"}`,
   ].join("\n");
 }

@@ -1,4 +1,4 @@
-import { request } from "undici";
+import { Dispatcher, ProxyAgent, request } from "undici";
 
 import { env } from "../../config/env";
 import { isRetryableNetworkError, sleep, toErrorMessage } from "../../lib/http";
@@ -21,6 +21,24 @@ async function readBody(body: AsyncIterable<Buffer>): Promise<string> {
   }
 
   return Buffer.concat(chunks).toString("utf-8");
+}
+
+const proxyAgents = new Map<string, Dispatcher>();
+
+function resolveDispatcher(proxyUrl?: string | null): Dispatcher | undefined {
+  if (!proxyUrl) {
+    return undefined;
+  }
+
+  const existingAgent = proxyAgents.get(proxyUrl);
+
+  if (existingAgent) {
+    return existingAgent;
+  }
+
+  const agent = new ProxyAgent(proxyUrl);
+  proxyAgents.set(proxyUrl, agent);
+  return agent;
 }
 
 function buildNetworkErrorMessage(error: unknown, timeoutMs: number): string {
@@ -65,6 +83,7 @@ export class HttpChecker {
           maxRedirections: env.MAX_REDIRECTS,
           headersTimeout: input.timeoutMs,
           bodyTimeout: input.timeoutMs,
+          dispatcher: resolveDispatcher(input.proxyUrl),
           headers: {
             "user-agent": env.MONITOR_USER_AGENT,
             accept: "*/*",

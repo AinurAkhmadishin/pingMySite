@@ -1,4 +1,4 @@
-import { JobsOptions, Queue, RepeatableJob } from "bullmq";
+import { JobsOptions, Queue } from "bullmq";
 import { Redis } from "ioredis";
 
 import { env } from "../config/env";
@@ -38,9 +38,12 @@ export function buildManualCheckJobId(monitorId: string, timestamp: number): str
 }
 
 export function buildIncidentTransitionJobId(payload: IncidentTransitionJobPayload): string {
-  return `incident-${sanitizeJobIdPart(payload.monitorId)}-${sanitizeJobIdPart(payload.transition)}-${sanitizeJobIdPart(
-    payload.checkedAt,
-  )}`;
+  return [
+    "incident",
+    sanitizeJobIdPart(payload.monitorId),
+    sanitizeJobIdPart(payload.transition),
+    sanitizeJobIdPart(payload.checkedAt),
+  ].join("-");
 }
 
 export function buildSslCheckJobId(monitorId: string, timestamp: number): string {
@@ -166,9 +169,9 @@ export class QueueManager implements MonitorSchedulerPort, IncidentPublisherPort
     }
   }
 
-  async syncMonitorSchedules(monitors: Array<{ id: string; intervalMinutes: number }>): Promise<void> {
+  async syncMonitorSchedules(monitors: Array<{ monitorId: string; intervalMinutes: number }>): Promise<void> {
     const repeatableJobs = await this.monitorCheckQueue.getRepeatableJobs();
-    const activeMonitorIds = new Set(monitors.map((monitor) => buildScheduledMonitorJobId(monitor.id)));
+    const activeMonitorIds = new Set(monitors.map((monitor) => buildScheduledMonitorJobId(monitor.monitorId)));
 
     await Promise.all(
       repeatableJobs
@@ -177,7 +180,7 @@ export class QueueManager implements MonitorSchedulerPort, IncidentPublisherPort
     );
 
     for (const monitor of monitors) {
-      await this.scheduleMonitor(monitor.id, monitor.intervalMinutes);
+      await this.scheduleMonitor(monitor.monitorId, monitor.intervalMinutes);
     }
 
     logger.info({ monitorCount: monitors.length }, "Monitor schedules synchronized");

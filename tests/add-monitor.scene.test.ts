@@ -2,19 +2,26 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { AppServices } from "../src/app/services";
 import { DEFAULT_FAILURE_THRESHOLD } from "../src/config/constants";
+import { ADD_MONITOR_FUNNEL_STEPS } from "../src/modules/funnels/funnel.constants";
 import { BotContext } from "../src/types/bot";
 
 vi.mock("../src/config/env", () => ({
   env: {
     DEFAULT_TIMEOUT_MS: 5000,
+    TELEGRAM_STARS_MONTHLY_PRICE: 99,
+    PAYMENTS_TERMS_URL: undefined,
+    PAYMENTS_SUPPORT_URL: undefined,
   },
 }));
 
+let startAddMonitorFlow: typeof import("../src/bot/scenes/add-monitor.scene").startAddMonitorFlow;
 let handleAddMonitorText: typeof import("../src/bot/scenes/add-monitor.scene").handleAddMonitorText;
 let handleAddMonitorCallback: typeof import("../src/bot/scenes/add-monitor.scene").handleAddMonitorCallback;
 
 beforeAll(async () => {
-  ({ handleAddMonitorText, handleAddMonitorCallback } = await import("../src/bot/scenes/add-monitor.scene"));
+  ({ startAddMonitorFlow, handleAddMonitorText, handleAddMonitorCallback } = await import(
+    "../src/bot/scenes/add-monitor.scene"
+  ));
 });
 
 function createContext(text: string): { ctx: BotContext; reply: ReturnType<typeof vi.fn> } {
@@ -27,6 +34,7 @@ function createContext(text: string): { ctx: BotContext; reply: ReturnType<typeo
       session: {
         flow: {
           kind: "add",
+          funnelSessionId: "funnel_1",
           step: "url",
           draft: {
             checkJson: false,
@@ -38,6 +46,7 @@ function createContext(text: string): { ctx: BotContext; reply: ReturnType<typeo
       state: {
         currentUser: {
           id: "user_1",
+          telegramId: "tg_1",
         },
       },
     } as unknown as BotContext,
@@ -49,9 +58,34 @@ function createServices(existingMonitor: unknown): {
   services: AppServices;
   findExistingMonitorByUrl: ReturnType<typeof vi.fn>;
   createMonitor: ReturnType<typeof vi.fn>;
+  createSubscriptionCheckout: ReturnType<typeof vi.fn>;
+  getActiveSubscriptionForUser: ReturnType<typeof vi.fn>;
+  startAddMonitorSession: ReturnType<typeof vi.fn>;
+  setAddMonitorStep: ReturnType<typeof vi.fn>;
+  appendAddMonitorEvent: ReturnType<typeof vi.fn>;
+  completeAddMonitorSession: ReturnType<typeof vi.fn>;
+  stopAddMonitorSession: ReturnType<typeof vi.fn>;
 } {
   const findExistingMonitorByUrl = vi.fn().mockResolvedValue(existingMonitor);
-  const createMonitor = vi.fn();
+  const createMonitor = vi.fn().mockResolvedValue({
+    id: "monitor_1",
+    name: "Example",
+    url: "https://example.com/",
+    intervalMinutes: 5,
+    endsAt: new Date("2026-05-24T10:00:00.000Z"),
+    checkSsl: false,
+    checkJson: false,
+  });
+  const createSubscriptionCheckout = vi.fn().mockResolvedValue({
+    amountStars: 99,
+    paymentUrl: "https://t.me/pay",
+  });
+  const getActiveSubscriptionForUser = vi.fn().mockResolvedValue(null);
+  const startAddMonitorSession = vi.fn().mockResolvedValue({ id: "funnel_new" });
+  const setAddMonitorStep = vi.fn().mockResolvedValue(undefined);
+  const appendAddMonitorEvent = vi.fn().mockResolvedValue(undefined);
+  const completeAddMonitorSession = vi.fn().mockResolvedValue(undefined);
+  const stopAddMonitorSession = vi.fn().mockResolvedValue(undefined);
 
   return {
     services: {
@@ -59,23 +93,50 @@ function createServices(existingMonitor: unknown): {
         findExistingMonitorByUrl,
         createMonitor,
       },
+      subscriptionService: {
+        createSubscriptionCheckout,
+        getActiveSubscriptionForUser,
+      },
+      funnelService: {
+        startAddMonitorSession,
+        setAddMonitorStep,
+        appendAddMonitorEvent,
+        completeAddMonitorSession,
+        stopAddMonitorSession,
+      },
     } as unknown as AppServices,
     findExistingMonitorByUrl,
     createMonitor,
+    createSubscriptionCheckout,
+    getActiveSubscriptionForUser,
+    startAddMonitorSession,
+    setAddMonitorStep,
+    appendAddMonitorEvent,
+    completeAddMonitorSession,
+    stopAddMonitorSession,
   };
 }
 
-function createCallbackContext(data: string): { ctx: BotContext; answerCbQuery: ReturnType<typeof vi.fn> } {
+function createCallbackContext(data: string): {
+  ctx: BotContext;
+  answerCbQuery: ReturnType<typeof vi.fn>;
+  reply: ReturnType<typeof vi.fn>;
+} {
   const answerCbQuery = vi.fn().mockResolvedValue(undefined);
+  const reply = vi.fn().mockResolvedValue(undefined);
 
   return {
     ctx: {
       callbackQuery: { data },
       answerCbQuery,
-      reply: vi.fn().mockResolvedValue(undefined),
+      reply,
+      chat: {
+        id: 123,
+      },
       session: {
         flow: {
           kind: "add",
+          funnelSessionId: "funnel_1",
           step: "duration",
           draft: {
             url: "https://example.com/",
@@ -90,23 +151,57 @@ function createCallbackContext(data: string): { ctx: BotContext; answerCbQuery: 
       state: {
         currentUser: {
           id: "user_1",
+          telegramId: "tg_1",
           timezone: "Europe/Moscow",
         },
       },
     } as unknown as BotContext,
     answerCbQuery,
+    reply,
   };
 }
 
 describe("add monitor scene", () => {
+  it("starts a new funnel session when the add flow begins", async () => {
+    const reply = vi.fn().mockResolvedValue(undefined);
+    const { services, startAddMonitorSession } = createServices(null);
+    const ctx = {
+      reply,
+      session: {},
+      state: {
+        currentUser: {
+          id: "user_1",
+          telegramId: "tg_1",
+        },
+      },
+    } as unknown as BotContext;
+
+    await startAddMonitorFlow(ctx, services);
+
+    expect(startAddMonitorSession).toHaveBeenCalledWith("user_1");
+    expect(ctx.session.flow).toMatchObject({
+      kind: "add",
+      funnelSessionId: "funnel_new",
+      step: "url",
+    });
+  });
+
   it("stops the flow immediately when the url already exists for the current user", async () => {
     const { ctx, reply } = createContext("example.com");
-    const { services, findExistingMonitorByUrl } = createServices({ id: "monitor_1" });
+    const { services, findExistingMonitorByUrl, stopAddMonitorSession } = createServices({ id: "monitor_1" });
 
     const handled = await handleAddMonitorText(ctx, services);
 
     expect(handled).toBe(true);
     expect(findExistingMonitorByUrl).toHaveBeenCalledWith("user_1", "https://example.com/");
+    expect(stopAddMonitorSession).toHaveBeenCalledWith(
+      "funnel_1",
+      "user_1",
+      ADD_MONITOR_FUNNEL_STEPS.duplicateUrlBlocked,
+      expect.objectContaining({
+        url: "https://example.com/",
+      }),
+    );
     expect(ctx.session.flow).toBeUndefined();
     expect(reply).toHaveBeenCalledTimes(1);
     expect(reply.mock.calls[0][0]).toContain("Опрос остановлен");
@@ -114,25 +209,41 @@ describe("add monitor scene", () => {
 
   it("stops the flow and warns when the site address is invalid", async () => {
     const { ctx, reply } = createContext("example");
-    const { services, findExistingMonitorByUrl } = createServices(null);
+    const { services, findExistingMonitorByUrl, stopAddMonitorSession } = createServices(null);
 
     const handled = await handleAddMonitorText(ctx, services);
 
     expect(handled).toBe(true);
     expect(findExistingMonitorByUrl).not.toHaveBeenCalled();
+    expect(stopAddMonitorSession).toHaveBeenCalledWith(
+      "funnel_1",
+      "user_1",
+      ADD_MONITOR_FUNNEL_STEPS.invalidUrl,
+      expect.objectContaining({
+        rawUrl: "example",
+      }),
+    );
     expect(ctx.session.flow).toBeUndefined();
     expect(reply).toHaveBeenCalledTimes(1);
     expect(reply.mock.calls[0][0]).toContain("Опрос остановлен");
   });
 
   it("moves to the name step when the url is unique", async () => {
-    const { ctx, reply } = createContext("example.com");
-    const { services, findExistingMonitorByUrl } = createServices(null);
+    const { ctx } = createContext("example.com");
+    const { services, findExistingMonitorByUrl, setAddMonitorStep } = createServices(null);
 
     const handled = await handleAddMonitorText(ctx, services);
 
     expect(handled).toBe(true);
     expect(findExistingMonitorByUrl).toHaveBeenCalledWith("user_1", "https://example.com/");
+    expect(setAddMonitorStep).toHaveBeenCalledWith(
+      "funnel_1",
+      "user_1",
+      ADD_MONITOR_FUNNEL_STEPS.awaitingName,
+      {
+        url: "https://example.com/",
+      },
+    );
     expect(ctx.session.flow).toMatchObject({
       kind: "add",
       step: "name",
@@ -140,21 +251,66 @@ describe("add monitor scene", () => {
     expect((ctx.session.flow as Extract<BotContext["session"]["flow"], { kind: "add" }>).draft.url).toBe(
       "https://example.com/",
     );
-    expect(reply).toHaveBeenCalledTimes(1);
   });
 
-  it("does not allow selecting a paid term while payments are disabled", async () => {
-    const { ctx, answerCbQuery } = createCallbackContext("add-duration-disabled:sub-1m");
-    const { services, createMonitor } = createServices(null);
+  it("starts Stars checkout when paid term is selected without an active subscription", async () => {
+    const { ctx, answerCbQuery, reply } = createCallbackContext("add-duration:sub-30d");
+    const { services, createMonitor, createSubscriptionCheckout, appendAddMonitorEvent } = createServices(null);
 
     const handled = await handleAddMonitorCallback(ctx, services);
 
     expect(handled).toBe(true);
+    expect(answerCbQuery).toHaveBeenCalled();
+    expect(appendAddMonitorEvent).toHaveBeenCalledWith(
+      "funnel_1",
+      "user_1",
+      ADD_MONITOR_FUNNEL_STEPS.subscriptionSelected,
+      {
+        termKey: "sub-30d",
+      },
+    );
     expect(createMonitor).not.toHaveBeenCalled();
-    expect(answerCbQuery).toHaveBeenCalledWith("Оплата подписки пока не подключена.");
-    expect(ctx.session.flow).toMatchObject({
-      kind: "add",
-      step: "duration",
+    expect(createSubscriptionCheckout).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "user_1",
+        chatId: "123",
+        funnelSessionId: "funnel_1",
+      }),
+    );
+    expect(reply).toHaveBeenCalledTimes(1);
+    expect(reply.mock.calls[0][0]).toContain("нужна активная подписка Telegram Stars");
+    expect(ctx.session.flow).toBeUndefined();
+  });
+
+  it("creates a paid monitor immediately when an active subscription already exists", async () => {
+    const { ctx, reply } = createCallbackContext("add-duration:sub-30d");
+    const { services, createMonitor, createSubscriptionCheckout, getActiveSubscriptionForUser, completeAddMonitorSession } =
+      createServices(null);
+    getActiveSubscriptionForUser.mockResolvedValue({
+      currentPeriodEnd: new Date("2026-05-10T12:00:00.000Z"),
     });
+
+    const handled = await handleAddMonitorCallback(ctx, services);
+
+    expect(handled).toBe(true);
+    expect(createSubscriptionCheckout).not.toHaveBeenCalled();
+    expect(createMonitor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "user_1",
+        termKind: "SUBSCRIPTION",
+      }),
+    );
+    expect(completeAddMonitorSession).toHaveBeenCalledWith(
+      "funnel_1",
+      "user_1",
+      ADD_MONITOR_FUNNEL_STEPS.monitorCreated,
+      expect.objectContaining({
+        monitorId: "monitor_1",
+        termKey: "sub-30d",
+        termKind: "subscription",
+      }),
+    );
+    expect(reply).toHaveBeenCalledTimes(1);
+    expect(reply.mock.calls[0][0]).toContain("Монитор сохранен");
   });
 });

@@ -6,11 +6,25 @@ import { AppServices } from "../app/services";
 import { env } from "../config/env";
 import { toErrorMessage } from "../lib/http";
 import { logger } from "../lib/logger";
+import { createDashboardRouter } from "./dashboard.routes";
 
 export async function startApiServer(services: AppServices): Promise<{ close: () => Promise<void> }> {
   const app = express();
 
+  app.use((req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", env.DASHBOARD_CORS_ORIGIN);
+    res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+    if (req.method === "OPTIONS") {
+      res.sendStatus(204);
+      return;
+    }
+
+    next();
+  });
   app.use(express.json());
+  app.use("/api/dashboard", createDashboardRouter(services));
 
   app.get("/", (_req, res) => {
     res.json({

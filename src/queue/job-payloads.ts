@@ -1,7 +1,8 @@
 import { IncidentTransitionType } from "../modules/incidents/incident-state";
 
 export interface MonitorCheckJobPayload {
-  monitorId: string;
+  monitorId?: string;
+  monitorProbeId?: string;
   origin: "scheduled" | "manual";
 }
 

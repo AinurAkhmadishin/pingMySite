@@ -2,8 +2,8 @@ import { PrismaClient } from "@prisma/client";
 
 import { REPORT_WINDOWS } from "../../config/constants";
 import { subtractHours } from "../../lib/date-time";
-import { MonitorRepository } from "../monitors/monitor.repository";
 import { IncidentRepository } from "../incidents/incident.repository";
+import { MonitorRepository } from "../monitors/monitor.repository";
 import { calculateUptimeStatistics } from "./uptime";
 
 export interface MonitorReportWindow {
@@ -96,7 +96,7 @@ export class ReportService {
       totalIncidents,
       lastIncidentReason: lastIncident?.reason,
       lastIncidentStartedAt: lastIncident?.startedAt,
-      openIncident: lastIncident?.status === "OPEN",
+      openIncident: recentIncidents.some((incident) => incident.status === "OPEN"),
       windows,
       recentIncidents: recentIncidents.map((incident) => ({
         startedAt: incident.startedAt,

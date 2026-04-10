@@ -1,10 +1,10 @@
 import { MonitorState, MonitorTermKind } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 
+import { buildMonitorListMessage, buildReportMessage, buildStatusMessage } from "../src/bot/messages/monitor-messages";
 import { formatDateTime } from "../src/lib/date-time";
 import { MonitorWithUser } from "../src/modules/monitors/monitor.repository";
 import { MonitorReport } from "../src/modules/reports/report.service";
-import { buildMonitorListMessage, buildReportMessage } from "../src/bot/messages/monitor-messages";
 
 function createMonitor(overrides: Partial<MonitorWithUser> = {}): MonitorWithUser {
   return {
@@ -41,6 +41,7 @@ function createMonitor(overrides: Partial<MonitorWithUser> = {}): MonitorWithUse
     jsonRules: null,
     termKind: MonitorTermKind.TRIAL,
     endsAt: null,
+    billingLocked: false,
     deletedAt: null,
     createdAt: new Date("2026-04-07T00:00:00.000Z"),
     updatedAt: new Date("2026-04-07T00:00:00.000Z"),
@@ -51,12 +52,9 @@ function createMonitor(overrides: Partial<MonitorWithUser> = {}): MonitorWithUse
 describe("monitor messages", () => {
   it("shows monitoring end date in list output", () => {
     const endsAt = new Date("2026-04-10T10:30:00.000Z");
-
     const message = buildMonitorListMessage([createMonitor({ endsAt })]);
 
-    expect(message).toContain(
-      `\u041c\u043e\u043d\u0438\u0442\u043e\u0440\u0438\u043d\u0433 \u0434\u043e: ${formatDateTime(endsAt, "Europe/Moscow")}`,
-    );
+    expect(message).toContain(formatDateTime(endsAt, "Europe/Moscow"));
   });
 
   it("shows monitoring end date in report output", () => {
@@ -85,8 +83,39 @@ describe("monitor messages", () => {
 
     const message = buildReportMessage(report, "Europe/Moscow");
 
-    expect(message).toContain(
-      `\u041c\u043e\u043d\u0438\u0442\u043e\u0440\u0438\u043d\u0433 \u0434\u043e: ${formatDateTime(endsAt, "Europe/Moscow")}`,
+    expect(message).toContain(formatDateTime(endsAt, "Europe/Moscow"));
+  });
+
+  it("shows expired state when a monitor is billing-locked", () => {
+    const message = buildStatusMessage([
+      createMonitor({
+        billingLocked: true,
+        currentState: MonitorState.PAUSED,
+        isActive: false,
+      }),
+    ]);
+
+    expect(message).toContain("EXPIRED");
+  });
+
+  it("does not mention legacy region sections in report output", () => {
+    const message = buildReportMessage(
+      {
+        monitorId: "monitor_1",
+        monitorName: "Example",
+        url: "https://example.com/",
+        currentState: "UP",
+        endsAt: null,
+        averageResponseTimeMs: 120,
+        totalIncidents: 0,
+        openIncident: false,
+        windows: [],
+        recentIncidents: [],
+      },
+      "Europe/Moscow",
     );
+
+    expect(message).not.toContain("[RU]");
+    expect(message).not.toContain("[GLOBAL]");
   });
 });

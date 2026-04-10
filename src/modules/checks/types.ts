@@ -12,6 +12,7 @@ export interface MonitorCheckExecutionInput {
   requiredText?: string | null;
   checkJson: boolean;
   jsonRules?: JsonRule[] | null;
+  proxyUrl?: string | null;
 }
 
 export interface MonitorCheckExecutionResult {

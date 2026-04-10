@@ -1,6 +1,6 @@
-import { MonitorWithUser } from "../monitors/monitor.repository";
 import { formatDateTime, formatDurationSeconds, formatPercent } from "../../lib/date-time";
 import { MonitorCheckExecutionResult } from "../checks/types";
+import { MonitorWithUser } from "../monitors/monitor.repository";
 
 export function buildDownAlertMessage(
   monitor: MonitorWithUser,
@@ -11,7 +11,7 @@ export function buildDownAlertMessage(
   },
 ): string {
   return [
-    "🔴 Сайт недоступен",
+    "Сайт недоступен",
     `Проект: ${monitor.name}`,
     `URL: ${monitor.url}`,
     `Причина: ${input.reason}`,
@@ -29,7 +29,7 @@ export function buildRecoveryAlertMessage(
   },
 ): string {
   return [
-    "🟢 Сайт восстановлен",
+    "Сайт восстановлен",
     `Проект: ${monitor.name}`,
     `URL: ${monitor.url}`,
     `Снова отвечает: ${input.statusCode ?? "n/a"}`,
@@ -46,7 +46,7 @@ export function buildSslExpiringAlertMessage(
   },
 ): string {
   return [
-    "🟠 SSL-сертификат скоро истечет",
+    "SSL-сертификат скоро истечет",
     `Проект: ${monitor.name}`,
     `URL: ${monitor.url}`,
     `Осталось дней: ${input.daysLeft}`,
@@ -54,9 +54,11 @@ export function buildSslExpiringAlertMessage(
   ].join("\n");
 }
 
-export function buildManualCheckMessage(result: MonitorCheckExecutionResult): string {
+export function buildManualCheckMessage(monitor: MonitorWithUser, result: MonitorCheckExecutionResult): string {
   return [
     "Проверка выполнена",
+    `Проект: ${monitor.name}`,
+    `URL: ${monitor.url}`,
     `Статус: ${result.statusCode ?? "n/a"}`,
     `Время ответа: ${result.responseTimeMs ?? "n/a"} ms`,
     `Текст найден: ${result.contentMatched === undefined ? "не задан" : result.contentMatched ? "да" : "нет"}`,
@@ -88,7 +90,7 @@ export function buildWeeklySummaryMessage(input: {
 }): string {
   const slowestLines =
     input.slowestMonitors.length > 0
-      ? input.slowestMonitors.map((monitor, index) => `${index + 1}. ${monitor.name} — ${monitor.averageResponseTimeMs} ms`)
+      ? input.slowestMonitors.map((monitor, index) => `${index + 1}. ${monitor.name} - ${monitor.averageResponseTimeMs} ms`)
       : ["1. Нет данных"];
 
   return [

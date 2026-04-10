@@ -4,24 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="1556166b-d9d0-4129-8f2b-991505ff760a" name="Changes" comment="5 commit">
+    <list default="true" id="1556166b-d9d0-4129-8f2b-991505ff760a" name="Changes" comment="7 commit">
+      <change beforePath="$PROJECT_DIR$/.env.example" beforeDir="false" afterPath="$PROJECT_DIR$/.env.example" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/prisma/schema.prisma" beforeDir="false" afterPath="$PROJECT_DIR$/prisma/schema.prisma" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/bot/keyboards/intervals.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/bot/keyboards/intervals.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/bot/messages/monitor-messages.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/bot/messages/monitor-messages.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/bot/scenes/add-monitor.scene.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/bot/scenes/add-monitor.scene.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/config/constants.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/constants.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/lib/date-time.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/date-time.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/lib/url.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/url.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/modules/monitors/monitor-check.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/modules/monitors/monitor-check.service.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/modules/monitors/monitor.repository.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/modules/monitors/monitor.repository.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/modules/monitors/monitor.schemas.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/modules/monitors/monitor.schemas.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/modules/monitors/monitor.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/modules/monitors/monitor.service.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/modules/reports/report.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/modules/reports/report.service.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/queue/queues.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/queue/queues.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/types/bot.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/types/bot.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/add-monitor.scene.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/tests/add-monitor.scene.test.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/monitor-schema.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/tests/monitor-schema.test.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.tools/redis/server/dump.rdb" beforeDir="false" afterPath="$PROJECT_DIR$/.tools/redis/server/dump.rdb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/config/env.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/env.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -58,6 +45,7 @@
     "RunOnceActivity.git.unshallow": "true",
     "git-widget-placeholder": "master",
     "ignore.virus.scanning.warn.message": "true",
+    "last_opened_file_path": "D:/pingBotTg",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -137,7 +125,9 @@
       <option name="presentableId" value="Default" />
       <updated>1775466875451</updated>
       <workItem from="1775466877808" duration="7511000" />
-      <workItem from="1775498430636" duration="9951000" />
+      <workItem from="1775498430636" duration="18167000" />
+      <workItem from="1775751785005" duration="74000" />
+      <workItem from="1775837805571" duration="410000" />
     </task>
     <task id="LOCAL-00001" summary="4 commit">
       <option name="closed" value="true" />
@@ -155,7 +145,23 @@
       <option name="project" value="LOCAL" />
       <updated>1775563537331</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="6 commit">
+      <option name="closed" value="true" />
+      <created>1775667038235</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1775667038235</updated>
+    </task>
+    <task id="LOCAL-00004" summary="7 commit">
+      <option name="closed" value="true" />
+      <created>1775838034431</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1775838034431</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -183,6 +189,8 @@
     <MESSAGE value="3 commit" />
     <MESSAGE value="4 commit" />
     <MESSAGE value="5 commit" />
-    <option name="LAST_COMMIT_MESSAGE" value="5 commit" />
+    <MESSAGE value="6 commit" />
+    <MESSAGE value="7 commit" />
+    <option name="LAST_COMMIT_MESSAGE" value="7 commit" />
   </component>
 </project>

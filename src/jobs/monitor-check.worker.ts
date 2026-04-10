@@ -15,7 +15,12 @@ export function createMonitorCheckWorker(services: AppServices, connection: Redi
         return;
       }
 
-      await services.monitorCheckService.runCheck(job.data.monitorId, job.data.origin);
+      if (!job.data.monitorId) {
+        logger.warn({ jobId: job.id, payload: job.data }, "Skipping legacy monitor check job without monitorId");
+        return;
+      }
+
+      await services.monitorCheckService.runMonitorCheck(job.data.monitorId, job.data.origin);
     },
     {
       connection,

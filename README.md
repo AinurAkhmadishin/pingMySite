@@ -14,6 +14,7 @@ Ping My Site Bot is a production-ready Telegram bot for website and API monitori
 - Background workers for scheduled checks, incident processing, SSL checks, daily summaries, and weekly summaries
 - Uptime reports for 24 hours, 7 days, and 30 days
 - Soft-delete of monitors with preserved historical data
+- Separate React dashboard for database-backed monitoring analytics
 - Docker, Docker Compose, Prisma schema, migrations, tests, and structured logging
 
 ## Architecture Overview
@@ -25,6 +26,7 @@ The repository is split into clear layers:
 - `src/queue` contains BullMQ queue integration and scheduler logic
 - `src/jobs` contains queue workers
 - `src/api` exposes health endpoints
+- `dashboard` contains the separate React dashboard application
 - `src/db` contains Prisma client wiring
 - `src/config` validates environment variables with Zod
 - `prisma` contains the schema, seed script, and migrations
@@ -66,6 +68,7 @@ src/
   queue/
   types/
 prisma/
+dashboard/
 tests/
 ```
 
@@ -123,7 +126,10 @@ Separate processes:
 npm run dev:api
 npm run dev:bot
 npm run dev:worker
+npm run dashboard:dev
 ```
+
+The React dashboard runs from the separate `dashboard/` directory and reads monitoring data from the existing API.
 
 ## Docker Setup
 
@@ -155,6 +161,7 @@ Important variables:
 - `DATABASE_URL` - PostgreSQL DSN
 - `REDIS_URL` - Redis DSN
 - `APP_HOST` / `APP_PORT` - Express API bind address
+- `DASHBOARD_CORS_ORIGIN` - allowed origin for the React dashboard, default `*`
 - `DEFAULT_TIMEOUT_MS` - default HTTP timeout for monitors
 - `MAX_REDIRECTS` - maximum redirects for HTTP checks
 - `MONITOR_USER_AGENT` - user-agent header used by checks
@@ -223,6 +230,7 @@ The scheduler restores active monitor repeat jobs on worker startup and keeps Bu
 ## Production Notes
 
 - Run bot, API, and workers as separate processes
+- Run the React dashboard separately with `npm --prefix dashboard run build` and serve `dashboard/dist`
 - Keep PostgreSQL and Redis persistent
 - Use `prisma migrate deploy` during deployment
 - Consider a process manager or orchestrator for restart policies
@@ -255,3 +263,22 @@ Covered logic:
 - per-user timezone editing from Telegram
 - webhook delivery mode
 - paid plans and limits
+
+## React Dashboard
+
+The repository now includes a standalone React dashboard in [dashboard/package.json](/D:/pingBotTg/dashboard/package.json).
+
+Useful commands:
+
+```bash
+npm run dashboard:dev
+npm run dashboard:build
+```
+
+The dashboard reads data from these API endpoints:
+
+- `GET /api/dashboard/overview`
+- `GET /api/dashboard/monitors`
+- `GET /api/dashboard/monitors/:monitorId`
+
+The API keeps CORS open through `DASHBOARD_CORS_ORIGIN`, so the dashboard can run on a separate port such as Vite's default `5173`.

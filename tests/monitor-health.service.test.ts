@@ -35,22 +35,22 @@ describe("monitor health service", () => {
 
     expect(prisma.monitor.count).toHaveBeenCalledWith({
       where: {
-        deletedAt: null,
-        isActive: true,
         currentState: MonitorState.UNKNOWN,
         updatedAt: {
           lte: new Date("2026-04-08T11:45:00.000Z"),
         },
+        deletedAt: null,
+        isActive: true,
       },
     });
     expect(prisma.monitor.findMany).toHaveBeenCalledWith({
       where: {
-        deletedAt: null,
-        isActive: true,
         currentState: MonitorState.UNKNOWN,
         updatedAt: {
           lte: new Date("2026-04-08T11:45:00.000Z"),
         },
+        deletedAt: null,
+        isActive: true,
       },
       select: {
         id: true,
@@ -70,5 +70,10 @@ describe("monitor health service", () => {
     expect(summary.count).toBe(2);
     expect(summary.staleAfterMinutes).toBe(15);
     expect(summary.monitors).toHaveLength(1);
+    expect(summary.monitors[0]).toMatchObject({
+      id: "monitor_1",
+      userId: "user_1",
+      name: "Example",
+    });
   });
 });

@@ -27,12 +27,12 @@ export class MonitorHealthService {
     const thresholdDate = new Date(now.getTime() - env.UNKNOWN_MONITOR_STALE_AFTER_MINUTES * 60 * 1000);
 
     return {
-      deletedAt: null,
-      isActive: true,
       currentState: MonitorState.UNKNOWN,
       updatedAt: {
         lte: thresholdDate,
       },
+      deletedAt: null,
+      isActive: true,
     };
   }
 
@@ -43,7 +43,7 @@ export class MonitorHealthService {
   }
 
   async listStuckUnknownMonitors(limit: number = 5, now: Date = new Date()): Promise<StuckUnknownMonitor[]> {
-    return this.prisma.monitor.findMany({
+    const rows = await this.prisma.monitor.findMany({
       where: this.buildStuckUnknownWhere(now),
       select: {
         id: true,
@@ -60,6 +60,17 @@ export class MonitorHealthService {
       },
       take: limit,
     });
+
+    return rows.map((row) => ({
+      id: row.id,
+      userId: row.userId,
+      name: row.name,
+      url: row.url,
+      intervalMinutes: row.intervalMinutes,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      lastCheckedAt: row.lastCheckedAt,
+    }));
   }
 
   async getStuckUnknownSummary(now: Date = new Date(), limit: number = 5): Promise<StuckUnknownMonitorSummary> {

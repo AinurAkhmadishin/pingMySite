@@ -1,7 +1,8 @@
-import { NotificationType, PrismaClient } from "@prisma/client";
+import { NotificationType, Prisma, PrismaClient } from "@prisma/client";
 import { Telegram } from "telegraf";
 
 import { logger } from "../../lib/logger";
+import { MonitorCheckExecutionResult } from "../checks/types";
 import { MonitorWithUser } from "../monitors/monitor.repository";
 import {
   buildDailySummaryMessage,
@@ -11,7 +12,6 @@ import {
   buildSslExpiringAlertMessage,
   buildWeeklySummaryMessage,
 } from "./message-builder";
-import { MonitorCheckExecutionResult } from "../checks/types";
 
 export class NotificationService {
   constructor(
@@ -23,7 +23,7 @@ export class NotificationService {
     monitor: MonitorWithUser,
     type: NotificationType,
     text: string,
-    payload: Record<string, string | number | boolean | null>,
+    payload: Prisma.InputJsonValue,
   ): Promise<void> {
     await this.telegram.sendMessage(monitor.user.telegramId, text);
 
@@ -100,15 +100,21 @@ export class NotificationService {
     );
   }
 
-  async sendManualCheckResult(monitor: MonitorWithUser, result: MonitorCheckExecutionResult): Promise<void> {
+  async sendManualCheckResult(
+    monitor: MonitorWithUser,
+    result: MonitorCheckExecutionResult,
+  ): Promise<void> {
     await this.sendAndLog(
       monitor,
       NotificationType.MANUAL_CHECK,
-      buildManualCheckMessage(result),
+      buildManualCheckMessage(monitor, result),
       {
         success: result.success,
         statusCode: result.statusCode ?? null,
         responseTimeMs: result.responseTimeMs ?? null,
+        errorMessage: result.errorMessage ?? null,
+        contentMatched: result.contentMatched ?? null,
+        jsonMatched: result.jsonMatched ?? null,
         checkedAt: result.checkedAt.toISOString(),
       },
     );

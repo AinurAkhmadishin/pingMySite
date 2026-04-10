@@ -3,11 +3,12 @@ import { session, Telegraf } from "telegraf";
 import { AppServices } from "../app/services";
 import { env } from "../config/env";
 import { logger } from "../lib/logger";
+import { BotContext } from "../types/bot";
 import { registerActionHandlers } from "./handlers/actions";
+import { registerPaymentHandlers } from "./handlers/payments";
 import { registerTextHandlers } from "./handlers/text";
 import { createUserMiddleware } from "./middlewares/user";
 import { registerCommands } from "./commands/register-commands";
-import { BotContext } from "../types/bot";
 
 export function createBot(services: AppServices): Telegraf<BotContext> {
   const bot = new Telegraf<BotContext>(env.BOT_TOKEN);
@@ -21,6 +22,7 @@ export function createBot(services: AppServices): Telegraf<BotContext> {
 
   registerCommands(bot, services);
   registerActionHandlers(bot, services);
+  registerPaymentHandlers(bot, services);
   registerTextHandlers(bot, services);
 
   bot.catch(async (error, ctx) => {
