@@ -1,7 +1,6 @@
 import { Telegraf } from "telegraf";
 
 import { AppServices } from "../../app/services";
-import { BOT_MENU_TEXT } from "../../config/constants";
 import { env } from "../../config/env";
 import { BotContext } from "../../types/bot";
 import { getCurrentUserOrThrow } from "../context";
@@ -20,7 +19,9 @@ import {
   buildSubscriptionStatusMessage,
   buildTermsMessage,
 } from "../messages/subscription-messages";
+import { buildSupportMessage, buildSupportUnavailableMessage } from "../messages/support-messages";
 import { startAddMonitorFlow } from "../scenes/add-monitor.scene";
+import { openSettingsHome } from "../scenes/settings.scene";
 
 async function withUserMonitors(
   ctx: BotContext,
@@ -98,14 +99,8 @@ export async function handleRemoveCommand(ctx: BotContext, services: AppServices
 }
 
 export async function handleSettingsCommand(ctx: BotContext, services: AppServices): Promise<void> {
-  const monitors = await withUserMonitors(ctx, services);
-
-  if (monitors.length === 0) {
-    await ctx.reply("Сначала добавьте монитор.");
-    return;
-  }
-
-  await ctx.reply("Выберите монитор для настройки.", monitorSelectionKeyboard(monitors, "settings-open"));
+  void services;
+  await openSettingsHome(ctx);
 }
 
 export async function handleCheckNowCommand(ctx: BotContext, services: AppServices): Promise<void> {
@@ -154,6 +149,17 @@ export async function handlePaySupportCommand(ctx: BotContext): Promise<void> {
   await ctx.reply(`${buildPaymentSupportMessage()}${suffix}`);
 }
 
+export async function handleSupportCommand(ctx: BotContext, services: AppServices): Promise<void> {
+  const monitors = await withUserMonitors(ctx, services);
+
+  if (monitors.length === 0) {
+    await ctx.reply(buildSupportUnavailableMessage(), mainMenuKeyboard());
+    return;
+  }
+
+  await ctx.reply(buildSupportMessage(), mainMenuKeyboard());
+}
+
 export function registerCommands(bot: Telegraf<BotContext>, services: AppServices): void {
   bot.start(handleStartCommand);
   bot.command("help", (ctx) => handleHelpCommand(ctx));
@@ -167,6 +173,7 @@ export function registerCommands(bot: Telegraf<BotContext>, services: AppService
   bot.command("settings", (ctx) => handleSettingsCommand(ctx, services));
   bot.command("checknow", (ctx) => handleCheckNowCommand(ctx, services));
   bot.command("subscription", (ctx) => handleSubscriptionCommand(ctx, services));
+  bot.command("support", (ctx) => handleSupportCommand(ctx, services));
   bot.command("terms", (ctx) => handleTermsCommand(ctx));
   bot.command("paysupport", (ctx) => handlePaySupportCommand(ctx));
 
@@ -180,9 +187,10 @@ export function registerCommands(bot: Telegraf<BotContext>, services: AppService
     { command: "pause", description: "Пауза мониторинга" },
     { command: "resume", description: "Возобновить мониторинг" },
     { command: "remove", description: "Удалить монитор" },
-    { command: "settings", description: "Изменить настройки" },
+    { command: "settings", description: "Настройки мониторов и уведомлений" },
     { command: "checknow", description: "Проверить монитор сейчас" },
     { command: "subscription", description: "Подписка и Stars" },
+    { command: "support", description: "Связаться с поддержкой" },
     { command: "terms", description: "Условия оплаты" },
     { command: "paysupport", description: "Поддержка по оплате" },
   ]);

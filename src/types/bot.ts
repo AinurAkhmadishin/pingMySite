@@ -1,10 +1,11 @@
 import { User } from "@prisma/client";
 import { Context } from "telegraf";
 
-import { MonitorTermKey } from "../config/constants";
+import { AddMonitorPresetKey, MonitorTermKey } from "../config/constants";
 import { JsonRule } from "../modules/checks/types";
 
 export interface AddMonitorDraft {
+  presetKey?: AddMonitorPresetKey;
   url?: string;
   name?: string;
   intervalMinutes?: number;
@@ -20,6 +21,7 @@ export interface AddMonitorFlow {
   kind: "add";
   funnelSessionId: string;
   step:
+    | "preset"
     | "url"
     | "name"
     | "interval"
@@ -39,7 +41,12 @@ export interface SettingsFlow {
   field: "requiredText" | "jsonRules";
 }
 
-export type BotFlow = AddMonitorFlow | SettingsFlow;
+export interface NotificationSettingsFlow {
+  kind: "notification-settings";
+  field: "dailySummaryTime";
+}
+
+export type BotFlow = AddMonitorFlow | SettingsFlow | NotificationSettingsFlow;
 
 export interface BotSession {
   flow?: BotFlow;

@@ -11,11 +11,14 @@ export function createSummaryWorker(services: AppServices, connection: Redis): W
   return new Worker<SummaryJobPayload>(
     QUEUE_NAMES.summaries,
     async (job) => {
-      if (job.name !== JOB_NAMES.dailySummary && job.name !== JOB_NAMES.weeklySummary) {
+      if (job.name === JOB_NAMES.accessReminders) {
+        await services.accessReminderService.run();
         return;
       }
 
-      await services.summaryService.run(job.data.frequency);
+      if (job.name === JOB_NAMES.dailySummary || job.name === JOB_NAMES.weeklySummary) {
+        await services.summaryService.run(job.data.frequency as "daily" | "weekly");
+      }
     },
     {
       connection,

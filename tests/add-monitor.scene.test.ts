@@ -61,6 +61,8 @@ function createServices(existingMonitor: unknown): {
   createSubscriptionCheckout: ReturnType<typeof vi.fn>;
   getActiveSubscriptionForUser: ReturnType<typeof vi.fn>;
   startAddMonitorSession: ReturnType<typeof vi.fn>;
+  getActiveAddMonitorSession: ReturnType<typeof vi.fn>;
+  listUserMonitors: ReturnType<typeof vi.fn>;
   setAddMonitorStep: ReturnType<typeof vi.fn>;
   appendAddMonitorEvent: ReturnType<typeof vi.fn>;
   completeAddMonitorSession: ReturnType<typeof vi.fn>;
@@ -81,6 +83,8 @@ function createServices(existingMonitor: unknown): {
     paymentUrl: "https://t.me/pay",
   });
   const getActiveSubscriptionForUser = vi.fn().mockResolvedValue(null);
+  const getActiveAddMonitorSession = vi.fn().mockResolvedValue(null);
+  const listUserMonitors = vi.fn().mockResolvedValue([{ id: "monitor_1" }, { id: "monitor_2" }]);
   const startAddMonitorSession = vi.fn().mockResolvedValue({ id: "funnel_new" });
   const setAddMonitorStep = vi.fn().mockResolvedValue(undefined);
   const appendAddMonitorEvent = vi.fn().mockResolvedValue(undefined);
@@ -92,12 +96,14 @@ function createServices(existingMonitor: unknown): {
       monitorService: {
         findExistingMonitorByUrl,
         createMonitor,
+        listUserMonitors,
       },
       subscriptionService: {
         createSubscriptionCheckout,
         getActiveSubscriptionForUser,
       },
       funnelService: {
+        getActiveAddMonitorSession,
         startAddMonitorSession,
         setAddMonitorStep,
         appendAddMonitorEvent,
@@ -110,6 +116,8 @@ function createServices(existingMonitor: unknown): {
     createSubscriptionCheckout,
     getActiveSubscriptionForUser,
     startAddMonitorSession,
+    getActiveAddMonitorSession,
+    listUserMonitors,
     setAddMonitorStep,
     appendAddMonitorEvent,
     completeAddMonitorSession,
@@ -178,11 +186,16 @@ describe("add monitor scene", () => {
 
     await startAddMonitorFlow(ctx, services);
 
-    expect(startAddMonitorSession).toHaveBeenCalledWith("user_1");
+    expect(startAddMonitorSession).toHaveBeenCalledWith(
+      "user_1",
+      expect.objectContaining({
+        step: "preset",
+      }),
+    );
     expect(ctx.session.flow).toMatchObject({
       kind: "add",
       funnelSessionId: "funnel_new",
-      step: "url",
+      step: "preset",
     });
   });
 
@@ -240,9 +253,12 @@ describe("add monitor scene", () => {
       "funnel_1",
       "user_1",
       ADD_MONITOR_FUNNEL_STEPS.awaitingName,
-      {
-        url: "https://example.com/",
-      },
+      expect.objectContaining({
+        step: "name",
+        draft: expect.objectContaining({
+          url: "https://example.com/",
+        }),
+      }),
     );
     expect(ctx.session.flow).toMatchObject({
       kind: "add",
@@ -265,9 +281,12 @@ describe("add monitor scene", () => {
       "funnel_1",
       "user_1",
       ADD_MONITOR_FUNNEL_STEPS.subscriptionSelected,
-      {
+      expect.objectContaining({
         termKey: "sub-30d",
-      },
+        snapshot: expect.objectContaining({
+          step: "duration",
+        }),
+      }),
     );
     expect(createMonitor).not.toHaveBeenCalled();
     expect(createSubscriptionCheckout).toHaveBeenCalledWith(

@@ -11,6 +11,27 @@ function toNullableJson(payload?: Record<string, unknown> | null) {
 export class FunnelRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
+  async findLatestActiveSession(userId: string, kind: FunnelSessionKind) {
+    return this.prisma.funnelSession.findFirst({
+      where: {
+        userId,
+        kind,
+        status: FunnelSessionStatus.ACTIVE,
+      },
+      orderBy: {
+        lastEventAt: "desc",
+      },
+    });
+  }
+
+  async findSessionById(sessionId: string) {
+    return this.prisma.funnelSession.findUnique({
+      where: {
+        id: sessionId,
+      },
+    });
+  }
+
   async startSession(input: {
     userId: string;
     kind: FunnelSessionKind;

@@ -5,14 +5,18 @@ import { env } from "../../config/env";
 import { BotContext } from "../../types/bot";
 import { getCurrentUserOrThrow } from "../context";
 import { removeConfirmationKeyboard } from "../keyboards/monitors";
-import { SimpleRateLimiter } from "../middlewares/rate-limit";
+import { RedisRateLimiter } from "../middlewares/rate-limit";
 import { buildReportMessage } from "../messages/monitor-messages";
 import { handleAddMonitorCallback } from "../scenes/add-monitor.scene";
 import { handleSettingsCallback } from "../scenes/settings.scene";
 
-const manualCheckLimiter = new SimpleRateLimiter(env.MANUAL_CHECK_RATE_LIMIT_SECONDS);
-
 export function registerActionHandlers(bot: Telegraf<BotContext>, services: AppServices): void {
+  const manualCheckLimiter = new RedisRateLimiter(
+    services.redis,
+    env.MANUAL_CHECK_RATE_LIMIT_SECONDS,
+    "manual-check",
+  );
+
   bot.on("callback_query", async (ctx) => {
     if (!("data" in ctx.callbackQuery)) {
       return;
@@ -86,7 +90,7 @@ export function registerActionHandlers(bot: Telegraf<BotContext>, services: AppS
 
     if (data.startsWith("check:")) {
       const monitorId = data.split(":")[1];
-      const rateLimit = manualCheckLimiter.check(`${currentUser.id}:${monitorId}`);
+      const rateLimit = await manualCheckLimiter.check(`${currentUser.id}:${monitorId}`);
 
       if (!rateLimit.allowed) {
         await ctx.answerCbQuery(`Подождите ${rateLimit.retryAfterSeconds} сек`, {

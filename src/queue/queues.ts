@@ -1,8 +1,8 @@
 import { JobsOptions, Queue } from "bullmq";
 import { Redis } from "ioredis";
 
+import { DAILY_SUMMARY_DISPATCH_INTERVAL_MS, JOB_NAMES, QUEUE_NAMES } from "../config/constants";
 import { env } from "../config/env";
-import { JOB_NAMES, QUEUE_NAMES } from "../config/constants";
 import { logger } from "../lib/logger";
 import { IncidentPublisherPort, SslPublisherPort } from "../modules/monitors/monitor-check.service";
 import { MonitorSchedulerPort } from "../modules/monitors/monitor.service";
@@ -136,7 +136,15 @@ export class QueueManager implements MonitorSchedulerPort, IncidentPublisherPort
   }
 
   async ensureSummaryJobs(): Promise<void> {
+    const repeatableJobs = await this.summaryQueue.getRepeatableJobs();
+
     if (env.ENABLE_DAILY_SUMMARIES) {
+      await Promise.all(
+        repeatableJobs
+          .filter((job) => job.name === JOB_NAMES.dailySummary)
+          .map((job) => this.summaryQueue.removeRepeatableByKey(job.key)),
+      );
+
       await this.summaryQueue.add(
         JOB_NAMES.dailySummary,
         {
@@ -144,15 +152,21 @@ export class QueueManager implements MonitorSchedulerPort, IncidentPublisherPort
         },
         {
           ...defaultJobOptions(),
-          jobId: "summary-daily",
+          jobId: "summary-daily-dispatch",
           repeat: {
-            every: 24 * 60 * 60 * 1000,
+            every: DAILY_SUMMARY_DISPATCH_INTERVAL_MS,
           },
         },
       );
     }
 
     if (env.ENABLE_WEEKLY_SUMMARIES) {
+      await Promise.all(
+        repeatableJobs
+          .filter((job) => job.name === JOB_NAMES.weeklySummary)
+          .map((job) => this.summaryQueue.removeRepeatableByKey(job.key)),
+      );
+
       await this.summaryQueue.add(
         JOB_NAMES.weeklySummary,
         {
@@ -163,6 +177,28 @@ export class QueueManager implements MonitorSchedulerPort, IncidentPublisherPort
           jobId: "summary-weekly",
           repeat: {
             every: 7 * 24 * 60 * 60 * 1000,
+          },
+        },
+      );
+    }
+
+    if (env.ENABLE_ACCESS_REMINDERS) {
+      await Promise.all(
+        repeatableJobs
+          .filter((job) => job.name === JOB_NAMES.accessReminders)
+          .map((job) => this.summaryQueue.removeRepeatableByKey(job.key)),
+      );
+
+      await this.summaryQueue.add(
+        JOB_NAMES.accessReminders,
+        {
+          frequency: "access-reminders",
+        },
+        {
+          ...defaultJobOptions(),
+          jobId: "access-reminders",
+          repeat: {
+            every: env.ACCESS_REMINDER_REPEAT_HOURS * 60 * 60 * 1000,
           },
         },
       );

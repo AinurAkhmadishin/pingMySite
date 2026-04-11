@@ -81,6 +81,15 @@ export class MonitorRepository {
     });
   }
 
+  async countUserMonitors(userId: string): Promise<number> {
+    return this.prisma.monitor.count({
+      where: {
+        userId,
+        deletedAt: null,
+      },
+    });
+  }
+
   async listActiveMonitors(): Promise<MonitorWithUser[]> {
     return this.prisma.monitor.findMany({
       where: {

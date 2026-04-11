@@ -4,6 +4,10 @@ export interface FunnelStepDefinition {
 }
 
 export const ADD_MONITOR_FUNNEL_STEPS = {
+  awaitingPreset: {
+    key: "awaiting_preset",
+    label: "Вопрос: тип мониторинга",
+  },
   awaitingUrl: {
     key: "awaiting_url",
     label: "Вопрос: URL сайта",
@@ -59,6 +63,18 @@ export const ADD_MONITOR_FUNNEL_STEPS = {
   invalidJsonRules: {
     key: "invalid_json_rules",
     label: "Ошибка: невалидные JSON-правила",
+  },
+  draftResumed: {
+    key: "draft_resumed",
+    label: "Шаг: черновик продолжен",
+  },
+  draftRestarted: {
+    key: "draft_restarted",
+    label: "Шаг: опрос начат заново",
+  },
+  cancelledByUser: {
+    key: "cancelled_by_user",
+    label: "Стоп: опрос отменен пользователем",
   },
   trialSelected: {
     key: "trial_selected",

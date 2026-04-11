@@ -66,6 +66,7 @@ export async function startApiServer(services: AppServices): Promise<{ close: ()
   });
 
   const server = createServer(app);
+  let adminAlertTimer: NodeJS.Timeout | undefined;
 
   await new Promise<void>((resolve) => {
     server.listen(env.APP_PORT, env.APP_HOST, () => {
@@ -74,8 +75,28 @@ export async function startApiServer(services: AppServices): Promise<{ close: ()
     });
   });
 
+  if (env.ENABLE_ADMIN_ALERTS && env.ADMIN_TELEGRAM_CHAT_ID) {
+    const runAdminHealthCheck = async () => {
+      try {
+        await services.adminAlertService.inspectAndNotify();
+      } catch (error) {
+        logger.error({ err: error }, "Failed to inspect admin health alerts");
+      }
+    };
+
+    void runAdminHealthCheck();
+    adminAlertTimer = setInterval(() => {
+      void runAdminHealthCheck();
+    }, env.ADMIN_ALERT_SCAN_INTERVAL_SECONDS * 1000);
+    adminAlertTimer.unref?.();
+  }
+
   return {
     close: async () => {
+      if (adminAlertTimer) {
+        clearInterval(adminAlertTimer);
+      }
+
       await new Promise<void>((resolve, reject) => {
         server.close((error) => {
           if (error) {

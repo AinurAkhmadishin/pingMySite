@@ -25,6 +25,26 @@ export class UserService {
     return this.userRepository.findByTelegramId(telegramId);
   }
 
+  async getUserById(userId: string): Promise<User | null> {
+    return this.userRepository.findById(userId);
+  }
+
+  async updateDailySummarySettings(
+    userId: string,
+    input: {
+      enabled?: boolean;
+      timeMinutes?: number | null;
+      lastSentAt?: Date | null;
+      promptedAt?: Date;
+    },
+  ): Promise<User> {
+    return this.userRepository.updateDailySummarySettings(userId, input);
+  }
+
+  async listUsersDueForDailySummary(timeMinutes: number, dayStart: Date): Promise<User[]> {
+    return this.userRepository.listUsersDueForDailySummary(timeMinutes, dayStart);
+  }
+
   async listUsersForSummary(frequency: "daily" | "weekly"): Promise<User[]> {
     return this.userRepository.listUsersForSummary(frequency);
   }

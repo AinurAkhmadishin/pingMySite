@@ -1,5 +1,6 @@
 import { MonitorState, MonitorTermKind, Prisma } from "@prisma/client";
 
+import { env } from "../../config/env";
 import { addMonths, formatDateTime } from "../../lib/date-time";
 import { normalizeUrl } from "../../lib/url";
 import { JsonRule } from "../checks/types";
@@ -54,6 +55,28 @@ export class MonitorService {
       throw new Error("Монитор для этого URL уже существует.");
     }
 
+    const activeSubscription = await this.subscriptionAccess.getActiveSubscriptionForUser(parsed.userId);
+    const hasPaidAccess = Boolean(activeSubscription);
+    const currentMonitorCount = await this.monitorRepository.countUserMonitors(parsed.userId);
+
+    if (!hasPaidAccess && currentMonitorCount >= env.FREE_MONITOR_LIMIT) {
+      throw new Error(
+        `На бесплатном доступе можно держать не больше ${env.FREE_MONITOR_LIMIT} монитор(ов). Подключите подписку через /subscription.`,
+      );
+    }
+
+    if (hasPaidAccess && currentMonitorCount >= env.SUBSCRIPTION_MONITOR_LIMIT) {
+      throw new Error(
+        `Достигнут лимит ${env.SUBSCRIPTION_MONITOR_LIMIT} монитор(ов) на аккаунт. Удалите лишние мониторы или увеличьте лимит в настройках проекта.`,
+      );
+    }
+
+    if (!hasPaidAccess && parsed.intervalMinutes < env.FREE_MIN_INTERVAL_MINUTES) {
+      throw new Error(
+        `На бесплатном доступе минимальный интервал проверки — ${env.FREE_MIN_INTERVAL_MINUTES} мин. Интервал 1 мин доступен только по подписке.`,
+      );
+    }
+
     let endsAt = parsed.endsAt ?? null;
 
     if (parsed.termKind === MonitorTermKind.TRIAL) {
@@ -71,8 +94,6 @@ export class MonitorService {
     }
 
     if (parsed.termKind === MonitorTermKind.SUBSCRIPTION) {
-      const activeSubscription = await this.subscriptionAccess.getActiveSubscriptionForUser(parsed.userId);
-
       if (!activeSubscription) {
         throw new Error("Для платного тарифа нужна активная подписка Telegram Stars.");
       }
@@ -183,6 +204,13 @@ export class MonitorService {
   ): Promise<MonitorWithUser> {
     const monitor = await this.getMonitorForUser(userId, monitorId);
     const parsed = updateMonitorSettingsSchema.parse(input);
+    const activeSubscription = await this.subscriptionAccess.getActiveSubscriptionForUser(userId);
+
+    if (!activeSubscription && parsed.intervalMinutes && parsed.intervalMinutes < env.FREE_MIN_INTERVAL_MINUTES) {
+      throw new Error(
+        `На бесплатном доступе минимальный интервал проверки — ${env.FREE_MIN_INTERVAL_MINUTES} мин.`,
+      );
+    }
 
     const updatedMonitor = await this.monitorRepository.updateMonitor(monitor.id, {
       intervalMinutes: parsed.intervalMinutes,

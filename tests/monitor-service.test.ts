@@ -51,6 +51,7 @@ function createService() {
   const repository = {
     findExistingByNormalizedUrl: vi.fn().mockResolvedValue(null),
     findLatestTrialByNormalizedUrl: vi.fn().mockResolvedValue(null),
+    countUserMonitors: vi.fn().mockResolvedValue(0),
     createMonitor: vi.fn().mockResolvedValue(createMonitor()),
     findByIdForUser: vi.fn(),
     updateMonitor: vi.fn(),

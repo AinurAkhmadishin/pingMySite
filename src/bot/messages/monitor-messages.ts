@@ -1,5 +1,6 @@
 import { MonitorState } from "@prisma/client";
 
+import { env } from "../../config/env";
 import { formatDateTime, formatDurationSeconds, formatPercent } from "../../lib/date-time";
 import { MonitorWithUser } from "../../modules/monitors/monitor.repository";
 import { MonitorReport } from "../../modules/reports/report.service";
@@ -31,10 +32,15 @@ function formatMonitorEndDate(endsAt: Date | null | undefined, timeZone: string)
 export function buildStartMessage(firstName?: string | null): string {
   return [
     `Привет${firstName ? `, ${firstName}` : ""}!`,
-    "Я Ping My Site Bot и слежу за доступностью сайтов и API прямо в Telegram.",
-    "Вы можете добавлять мониторы, получать уведомления о сбоях, смотреть uptime, историю инцидентов и контролировать SSL.",
-    "Начните с команды /add или используйте кнопки меню ниже.",
-  ].join("\n\n");
+    "Ваш помощник по мониторингу сайтов и API: проверка доступности, уведомления о сбоях и ежедневные сводки.",
+    "Быстрый старт:",
+    "1. Нажмите «Добавить»",
+    "2. Выберите пресет: сайт, лендинг, API JSON или health endpoint",
+    "3. Укажите URL и завершите настройку за пару сообщений",
+    "",
+    `Пробный доступ: 14 дней, до ${env.FREE_MONITOR_LIMIT} монитор(ов), интервалы от ${env.FREE_MIN_INTERVAL_MINUTES} мин.`,
+    `Подписка: 30 дней за ${env.TELEGRAM_STARS_MONTHLY_PRICE} Stars.`,
+  ].join("\n");
 }
 
 export function buildHelpMessage(): string {
@@ -49,15 +55,16 @@ export function buildHelpMessage(): string {
     "/pause — поставить монитор на паузу",
     "/resume — возобновить мониторинг",
     "/remove — удалить монитор",
-    "/settings — изменить интервал, текст, JSON-правила, чувствительность и SSL",
+    "/settings — изменить настройки мониторов и уведомлений",
     "/checknow — выполнить немедленную проверку",
     "/subscription — статус подписки и оплата через Stars",
+    "/support — связаться с поддержкой",
     "/terms — условия оплаты",
     "/paysupport — поддержка по оплате",
     "",
     "Тарифы:",
-    "1. Пробный период 14 дней",
-    "2. Подписка на 30 дней через Telegram Stars",
+    `1. Пробный период 14 дней — до ${env.FREE_MONITOR_LIMIT} монитор(ов), интервалы от ${env.FREE_MIN_INTERVAL_MINUTES} мин`,
+    `2. Подписка на 30 дней через Telegram Stars — до ${env.SUBSCRIPTION_MONITOR_LIMIT} монитор(ов), интервалы от 1 мин`,
     "",
     "Поддерживаются: HTTP/HTTPS-проверки, контроль текста на странице, JSON-валидация, SSL-уведомления и антифлаппинг.",
   ].join("\n");

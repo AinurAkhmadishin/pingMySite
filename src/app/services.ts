@@ -14,10 +14,12 @@ import { MonitorCheckService } from "../modules/monitors/monitor-check.service";
 import { MonitorHealthService } from "../modules/monitors/monitor-health.service";
 import { MonitorRepository } from "../modules/monitors/monitor.repository";
 import { MonitorService } from "../modules/monitors/monitor.service";
+import { AccessReminderService } from "../modules/notifications/access-reminder.service";
 import { NotificationService } from "../modules/notifications/notification.service";
 import { ReportService } from "../modules/reports/report.service";
 import { SummaryService } from "../modules/reports/summary.service";
 import { SslService } from "../modules/ssl/ssl.service";
+import { AdminAlertService } from "../modules/system/admin-alert.service";
 import { WorkerHealthService } from "../modules/system/worker-health.service";
 import { SubscriptionRepository } from "../modules/subscriptions/subscription.repository";
 import { SubscriptionService } from "../modules/subscriptions/subscription.service";
@@ -39,6 +41,8 @@ export interface AppServices {
   summaryService: SummaryService;
   sslService: SslService;
   notificationService: NotificationService;
+  accessReminderService: AccessReminderService;
+  adminAlertService: AdminAlertService;
   workerHealthService: WorkerHealthService;
   subscriptionService: SubscriptionService;
 }
@@ -62,12 +66,14 @@ export function createAppServices(): AppServices {
     funnelService,
   );
   const notificationService = new NotificationService(prisma, telegram);
+  const accessReminderService = new AccessReminderService(prisma, notificationService);
   const reportService = new ReportService(prisma, monitorRepository, incidentRepository);
   const summaryService = new SummaryService(userService, reportService, notificationService);
   const sslService = new SslService(prisma, monitorRepository, notificationService);
   const incidentService = new IncidentService(incidentRepository, monitorRepository, notificationService);
   const monitorHealthService = new MonitorHealthService(prisma);
   const workerHealthService = new WorkerHealthService(redis);
+  const adminAlertService = new AdminAlertService(notificationService, workerHealthService, monitorHealthService);
   const dashboardService = new DashboardService(prisma, workerHealthService, monitorHealthService);
   const monitorCheckService = new MonitorCheckService(
     monitorRepository,
@@ -93,6 +99,8 @@ export function createAppServices(): AppServices {
     summaryService,
     sslService,
     notificationService,
+    accessReminderService,
+    adminAlertService,
     workerHealthService,
     subscriptionService,
   };

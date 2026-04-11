@@ -4,11 +4,11 @@ import { AppServices } from "../app/services";
 import { env } from "../config/env";
 import { logger } from "../lib/logger";
 import { BotContext } from "../types/bot";
+import { registerCommands } from "./commands/register-commands";
 import { registerActionHandlers } from "./handlers/actions";
 import { registerPaymentHandlers } from "./handlers/payments";
 import { registerTextHandlers } from "./handlers/text";
 import { createUserMiddleware } from "./middlewares/user";
-import { registerCommands } from "./commands/register-commands";
 
 export function createBot(services: AppServices): Telegraf<BotContext> {
   const bot = new Telegraf<BotContext>(env.BOT_TOKEN);

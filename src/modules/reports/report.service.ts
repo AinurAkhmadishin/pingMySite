@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { MonitorState, PrismaClient } from "@prisma/client";
 
 import { REPORT_WINDOWS } from "../../config/constants";
 import { subtractHours } from "../../lib/date-time";
@@ -31,6 +31,21 @@ export interface MonitorReport {
     durationSeconds?: number | null;
     reason: string;
     status: string;
+  }>;
+}
+
+export interface UserDailyStatusSummary {
+  activeMonitorCount: number;
+  pausedMonitorCount: number;
+  upCount: number;
+  downCount: number;
+  unknownCount: number;
+  problematicMonitors: Array<{
+    name: string;
+    url: string;
+    state: "DOWN" | "UNKNOWN";
+    lastCheckedAt?: Date | null;
+    lastErrorMessage?: string | null;
   }>;
 }
 
@@ -105,6 +120,42 @@ export class ReportService {
         reason: incident.reason,
         status: incident.status,
       })),
+    };
+  }
+
+  async getUserDailyStatusSummary(userId: string): Promise<UserDailyStatusSummary | null> {
+    const now = new Date();
+    const monitors = await this.monitorRepository.listByUser(userId);
+    const activeMonitors = monitors.filter(
+      (monitor) =>
+        monitor.isActive &&
+        monitor.currentState !== MonitorState.PAUSED &&
+        !monitor.billingLocked &&
+        (!monitor.endsAt || monitor.endsAt > now),
+    );
+
+    if (activeMonitors.length === 0) {
+      return null;
+    }
+
+    return {
+      activeMonitorCount: activeMonitors.length,
+      pausedMonitorCount: monitors.filter((monitor) => !monitor.billingLocked && !monitor.isActive).length,
+      upCount: activeMonitors.filter((monitor) => monitor.currentState === MonitorState.UP).length,
+      downCount: activeMonitors.filter((monitor) => monitor.currentState === MonitorState.DOWN).length,
+      unknownCount: activeMonitors.filter((monitor) => monitor.currentState === MonitorState.UNKNOWN).length,
+      problematicMonitors: activeMonitors
+        .filter(
+          (monitor) => monitor.currentState === MonitorState.DOWN || monitor.currentState === MonitorState.UNKNOWN,
+        )
+        .slice(0, 3)
+        .map((monitor) => ({
+          name: monitor.name,
+          url: monitor.url,
+          state: monitor.currentState === MonitorState.DOWN ? "DOWN" : "UNKNOWN",
+          lastCheckedAt: monitor.lastCheckedAt,
+          lastErrorMessage: monitor.lastErrorMessage,
+        })),
     };
   }
 

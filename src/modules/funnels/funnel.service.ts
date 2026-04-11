@@ -10,10 +10,18 @@ export class FunnelService {
     return this.funnelRepository.startSession({
       userId,
       kind: FunnelSessionKind.ADD_MONITOR,
-      stepKey: ADD_MONITOR_FUNNEL_STEPS.awaitingUrl.key,
-      stepLabel: ADD_MONITOR_FUNNEL_STEPS.awaitingUrl.label,
+      stepKey: ADD_MONITOR_FUNNEL_STEPS.awaitingPreset.key,
+      stepLabel: ADD_MONITOR_FUNNEL_STEPS.awaitingPreset.label,
       payload,
     });
+  }
+
+  async getActiveAddMonitorSession(userId: string) {
+    return this.funnelRepository.findLatestActiveSession(userId, FunnelSessionKind.ADD_MONITOR);
+  }
+
+  async getSessionById(sessionId: string) {
+    return this.funnelRepository.findSessionById(sessionId);
   }
 
   async setAddMonitorStep(

@@ -4,11 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="1556166b-d9d0-4129-8f2b-991505ff760a" name="Changes" comment="7 commit">
-      <change beforePath="$PROJECT_DIR$/.env.example" beforeDir="false" afterPath="$PROJECT_DIR$/.env.example" afterDir="false" />
+    <list default="true" id="1556166b-d9d0-4129-8f2b-991505ff760a" name="Changes" comment="8 commit">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.tools/redis/server/dump.rdb" beforeDir="false" afterPath="$PROJECT_DIR$/.tools/redis/server/dump.rdb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/config/env.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/env.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -45,7 +43,7 @@
     "RunOnceActivity.git.unshallow": "true",
     "git-widget-placeholder": "master",
     "ignore.virus.scanning.warn.message": "true",
-    "last_opened_file_path": "D:/pingBotTg",
+    "last_opened_file_path": "D:/pingBotDashbord",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -127,7 +125,8 @@
       <workItem from="1775466877808" duration="7511000" />
       <workItem from="1775498430636" duration="18167000" />
       <workItem from="1775751785005" duration="74000" />
-      <workItem from="1775837805571" duration="410000" />
+      <workItem from="1775837805571" duration="3261000" />
+      <workItem from="1775844404242" duration="14000" />
     </task>
     <task id="LOCAL-00001" summary="4 commit">
       <option name="closed" value="true" />
@@ -161,7 +160,15 @@
       <option name="project" value="LOCAL" />
       <updated>1775838034431</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="8 commit">
+      <option name="closed" value="true" />
+      <created>1775838609938</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1775838609938</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -191,6 +198,7 @@
     <MESSAGE value="5 commit" />
     <MESSAGE value="6 commit" />
     <MESSAGE value="7 commit" />
-    <option name="LAST_COMMIT_MESSAGE" value="7 commit" />
+    <MESSAGE value="8 commit" />
+    <option name="LAST_COMMIT_MESSAGE" value="8 commit" />
   </component>
 </project>

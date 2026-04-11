@@ -1,7 +1,13 @@
 import { MonitorState, MonitorTermKind } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 
-import { buildMonitorListMessage, buildReportMessage, buildStatusMessage } from "../src/bot/messages/monitor-messages";
+import {
+  buildHelpMessage,
+  buildMonitorListMessage,
+  buildReportMessage,
+  buildStartMessage,
+  buildStatusMessage,
+} from "../src/bot/messages/monitor-messages";
 import { formatDateTime } from "../src/lib/date-time";
 import { MonitorWithUser } from "../src/modules/monitors/monitor.repository";
 import { MonitorReport } from "../src/modules/reports/report.service";
@@ -50,6 +56,13 @@ function createMonitor(overrides: Partial<MonitorWithUser> = {}): MonitorWithUse
 }
 
 describe("monitor messages", () => {
+  it("uses a presentable product intro in start message", () => {
+    const message = buildStartMessage("Анна");
+
+    expect(message).toContain("Ваш помощник по мониторингу сайтов и API");
+    expect(message).not.toContain("Ping My Site Bot");
+  });
+
   it("shows monitoring end date in list output", () => {
     const endsAt = new Date("2026-04-10T10:30:00.000Z");
     const message = buildMonitorListMessage([createMonitor({ endsAt })]);
@@ -117,5 +130,9 @@ describe("monitor messages", () => {
 
     expect(message).not.toContain("[RU]");
     expect(message).not.toContain("[GLOBAL]");
+  });
+
+  it("mentions support command in help output", () => {
+    expect(buildHelpMessage()).toContain("/support");
   });
 });

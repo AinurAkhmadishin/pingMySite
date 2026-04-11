@@ -1,10 +1,10 @@
 import { Markup } from "telegraf";
 
-import { MONITOR_TERM_PLANS, SUPPORTED_INTERVALS } from "../../config/constants";
+import { MONITOR_TERM_PLANS, SUPPORTED_INTERVALS, SupportedInterval } from "../../config/constants";
 
-export function intervalKeyboard(prefix: string) {
+export function intervalKeyboard(prefix: string, values: readonly SupportedInterval[] = SUPPORTED_INTERVALS) {
   return Markup.inlineKeyboard(
-    SUPPORTED_INTERVALS.map((value) => Markup.button.callback(`${value} \u043c\u0438\u043d`, `${prefix}:${value}`)),
+    values.map((value) => Markup.button.callback(`${value} мин`, `${prefix}:${value}`)),
     {
       columns: 2,
     },

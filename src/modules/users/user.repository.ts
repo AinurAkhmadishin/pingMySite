@@ -45,6 +45,50 @@ export class UserRepository {
     });
   }
 
+  async updateDailySummarySettings(
+    userId: string,
+    input: {
+      enabled?: boolean;
+      timeMinutes?: number | null;
+      lastSentAt?: Date | null;
+      promptedAt?: Date;
+    },
+  ): Promise<User> {
+    return this.prisma.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        dailySummaryEnabled: input.enabled,
+        dailySummaryTimeMinutes: input.timeMinutes,
+        dailySummaryLastSentAt: input.lastSentAt,
+        dailySummaryPromptedAt: input.promptedAt,
+      },
+    });
+  }
+
+  async listUsersDueForDailySummary(timeMinutes: number, dayStart: Date): Promise<User[]> {
+    return this.prisma.user.findMany({
+      where: {
+        dailySummaryEnabled: true,
+        dailySummaryTimeMinutes: timeMinutes,
+        OR: [
+          {
+            dailySummaryLastSentAt: null,
+          },
+          {
+            dailySummaryLastSentAt: {
+              lt: dayStart,
+            },
+          },
+        ],
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+  }
+
   async listUsersForSummary(frequency: "daily" | "weekly"): Promise<User[]> {
     return this.prisma.user.findMany({
       where: frequency === "daily" ? { dailySummaryEnabled: true } : { weeklySummaryEnabled: true },

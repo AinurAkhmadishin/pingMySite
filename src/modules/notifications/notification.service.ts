@@ -123,13 +123,28 @@ export class NotificationService {
   async sendDailySummary(
     chatId: string,
     input: {
-      monitorCount: number;
-      failedChecks: number;
-      incidentsOpened: number;
-      averageUptimePercent: number;
+      activeMonitorCount: number;
+      pausedMonitorCount: number;
+      upCount: number;
+      downCount: number;
+      unknownCount: number;
+      problematicMonitors: Array<{
+        name: string;
+        url: string;
+        state: "DOWN" | "UNKNOWN";
+        lastCheckedAt?: Date | null;
+        lastErrorMessage?: string | null;
+      }>;
     },
+    timeZone: string,
   ): Promise<void> {
-    await this.sendPlainMessage(chatId, buildDailySummaryMessage(input));
+    await this.sendPlainMessage(
+      chatId,
+      buildDailySummaryMessage({
+        ...input,
+        timeZone,
+      }),
+    );
   }
 
   async sendWeeklySummary(

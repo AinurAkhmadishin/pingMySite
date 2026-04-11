@@ -21,5 +21,5 @@ export interface SslCheckJobPayload {
 }
 
 export interface SummaryJobPayload {
-  frequency: "daily" | "weekly";
+  frequency: "daily" | "weekly" | "access-reminders";
 }

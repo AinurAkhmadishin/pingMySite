@@ -1,31 +1,33 @@
+import { Redis } from "ioredis";
+
 export interface RateLimitResult {
   allowed: boolean;
   retryAfterSeconds: number;
 }
 
-export class SimpleRateLimiter {
-  private readonly storage = new Map<string, number>();
+export class RedisRateLimiter {
+  constructor(
+    private readonly redis: Redis,
+    private readonly windowSeconds: number,
+    private readonly namespace = "rate-limit",
+  ) {}
 
-  constructor(private readonly windowSeconds: number) {}
+  async check(key: string): Promise<RateLimitResult> {
+    const redisKey = `${this.namespace}:${key}`;
+    const created = await this.redis.set(redisKey, Date.now().toString(), "EX", this.windowSeconds, "NX");
 
-  check(key: string): RateLimitResult {
-    const now = Date.now();
-    const lastExecution = this.storage.get(key) ?? 0;
-    const elapsedMs = now - lastExecution;
-    const windowMs = this.windowSeconds * 1000;
-
-    if (elapsedMs < windowMs) {
+    if (created === "OK") {
       return {
-        allowed: false,
-        retryAfterSeconds: Math.ceil((windowMs - elapsedMs) / 1000),
+        allowed: true,
+        retryAfterSeconds: 0,
       };
     }
 
-    this.storage.set(key, now);
+    const ttlSeconds = await this.redis.ttl(redisKey);
 
     return {
-      allowed: true,
-      retryAfterSeconds: 0,
+      allowed: false,
+      retryAfterSeconds: ttlSeconds > 0 ? ttlSeconds : this.windowSeconds,
     };
   }
 }
