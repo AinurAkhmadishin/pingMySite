@@ -71,7 +71,9 @@ export class UserRepository {
     return this.prisma.user.findMany({
       where: {
         dailySummaryEnabled: true,
-        dailySummaryTimeMinutes: timeMinutes,
+        dailySummaryTimeMinutes: {
+          lte: timeMinutes,
+        },
         OR: [
           {
             dailySummaryLastSentAt: null,
@@ -83,9 +85,14 @@ export class UserRepository {
           },
         ],
       },
-      orderBy: {
-        createdAt: "asc",
-      },
+      orderBy: [
+        {
+          dailySummaryTimeMinutes: "asc",
+        },
+        {
+          createdAt: "asc",
+        },
+      ],
     });
   }
 
