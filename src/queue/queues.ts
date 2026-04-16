@@ -158,6 +158,16 @@ export class QueueManager implements MonitorSchedulerPort, IncidentPublisherPort
           },
         },
       );
+
+      logger.info(
+        {
+          jobName: JOB_NAMES.dailySummary,
+          intervalMs: DAILY_SUMMARY_DISPATCH_INTERVAL_MS,
+        },
+        "Daily summary job ensured",
+      );
+    } else {
+      logger.warn("Daily summaries are disabled by env");
     }
 
     if (env.ENABLE_WEEKLY_SUMMARIES) {

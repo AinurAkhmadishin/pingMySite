@@ -49,13 +49,42 @@ export class SummaryService {
     const dayStart = getStartOfMoscowDay(now);
     const users = await this.userService.listUsersDueForDailySummary(currentMoscowMinutes, dayStart);
 
+    logger.info(
+      {
+        currentMoscowMinutes,
+        dayStart: dayStart.toISOString(),
+        dueUserCount: users.length,
+      },
+      "Running daily summary dispatch",
+    );
+
     for (const user of users) {
       try {
         const summary = await this.reportService.getUserDailyStatusSummary(user.id);
 
         if (!summary) {
+          logger.info(
+            {
+              userId: user.id,
+              telegramId: user.telegramId,
+              dailySummaryTimeMinutes: user.dailySummaryTimeMinutes,
+            },
+            "Skipping daily summary because user has no active monitors",
+          );
           continue;
         }
+
+        logger.info(
+          {
+            userId: user.id,
+            telegramId: user.telegramId,
+            dailySummaryTimeMinutes: user.dailySummaryTimeMinutes,
+            activeMonitorCount: summary.activeMonitorCount,
+            downCount: summary.downCount,
+            unknownCount: summary.unknownCount,
+          },
+          "Sending daily summary",
+        );
 
         await this.notificationService.sendDailySummary(
           user.telegramId,
@@ -72,8 +101,26 @@ export class SummaryService {
         await this.userService.updateDailySummarySettings(user.id, {
           lastSentAt: now,
         });
+
+        logger.info(
+          {
+            userId: user.id,
+            telegramId: user.telegramId,
+            lastSentAt: now.toISOString(),
+          },
+          "Daily summary sent",
+        );
       } catch (error) {
-        logger.error({ err: error, userId: user.id, frequency: "daily" }, "Failed to send summary");
+        logger.error(
+          {
+            err: error,
+            userId: user.id,
+            telegramId: user.telegramId,
+            dailySummaryTimeMinutes: user.dailySummaryTimeMinutes,
+            frequency: "daily",
+          },
+          "Failed to send summary",
+        );
       }
     }
   }
